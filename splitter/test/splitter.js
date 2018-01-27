@@ -7,7 +7,7 @@ const HasNoEther = artifacts.require("HasNoEther");
 // Utility for error
 const assertError = (e) => assert.include(e.message, 'revert', "contract din't throw");
 
-const getBalances = async (addresses) => {
+const getBalances = (addresses) => {
     let result = [];
     for (let addr of addresses) {
         let b = web3.eth.getBalance(addr);
@@ -16,8 +16,8 @@ const getBalances = async (addresses) => {
     return result;
 }
 
-const printBalances = async (prefix, addresses, unit = "ether") => {
-    const balances = await getBalances(addresses);
+const printBalances = (prefix, addresses, unit = "ether") => {
+    const balances = getBalances(addresses);
     console.debug(prefix, balances.map(b => web3.fromWei(b, unit).toNumber()).join('\t'));
     return balances;
 }
@@ -26,7 +26,7 @@ const printBalances = async (prefix, addresses, unit = "ether") => {
 const testSplit = async (contract, A, B, C, call) => {
     const addresses = [contract.address, A, B, C];
     // get before balances
-    const before = await printBalances('Before:', addresses);
+    const before = printBalances('Before:', addresses);
 
     // make call
     try {
@@ -61,7 +61,7 @@ const testSplit = async (contract, A, B, C, call) => {
     }
 
     // get after balances
-    await printBalances('After:', addresses);
+    printBalances('After:', addresses);
 
     return [bError, cError];
 }

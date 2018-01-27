@@ -7,7 +7,7 @@ import 'zeppelin-solidity/contracts/payment/PullPayment.sol';
 import 'zeppelin-solidity/contracts/ownership/HasNoEther.sol';
 
 contract Splitter is Pausable, Destructible, PullPayment {
-    event Split(address from, address to, uint value);
+    event LogSplit(address indexed a, address indexed b, address indexed c, uint value);
 
     function Splitter() public {
     }
@@ -19,9 +19,8 @@ contract Splitter is Pausable, Destructible, PullPayment {
         require(c != address(0)); // must exist
         uint halfValue = msg.value / 2;
         asyncSend(b, halfValue);
-        Split(msg.sender, b, halfValue);
         asyncSend(c, halfValue);
-        Split(msg.sender, c, halfValue);
+        LogSplit(msg.sender, b, c, halfValue);
         return true;
     }
 }
