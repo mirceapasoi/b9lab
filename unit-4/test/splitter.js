@@ -81,7 +81,7 @@ contract("Splitter", (accounts) => {
 
     afterEach("print gas", () => {
         let gasUsed = getAndClearGas();
-        console.log(`${gasUsed} gas used`);
+        console.log(`${gasUsed.toLocaleString()} gas used`);
     })
 
     beforeEach("new contract", async () => {
