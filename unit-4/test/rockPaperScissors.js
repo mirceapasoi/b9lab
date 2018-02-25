@@ -41,6 +41,13 @@ contract("RockPaperScissors", (accounts) => {
         startTime = latestTime();
     });
 
+    it("should hash moves", async () => {
+        let encodeA = await contract.hashMove(2, "playerA");
+        let encodeB = await contract.hashMove(1, "playerB");
+        assert.equal(secretA, encodeA);
+        assert.equal(secretB, encodeB);
+    });
+
     it("should let you withdraw after 1 hour", async () => {
         // A enrolls
         await assertOkTx(contract.enroll(B, {from: A, value: valueA}));

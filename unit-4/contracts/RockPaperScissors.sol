@@ -40,6 +40,11 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         return true;
     }
 
+    // Called by player off-chain to hide their move
+    function hashMove(Move move, string secret) public pure returns (bytes32) {
+        return keccak256(move, secret);
+    }
+
     function getGameKeys(address with) public view whenNotPaused returns (bytes32, bytes32) {
         // Given two addresses A, B we hash "AB" as the key for "A wants to play with B",
         // and "BA" as the key for "B wants to play with A".
@@ -78,7 +83,7 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         delete games[otherKey];
     }
 
-    function _getOutcome(Move move, Move otherMove) private pure returns (Outcome) {
+    function getOutcome(Move move, Move otherMove) public pure returns (Outcome) {
         if (move == Move.NONE)
             return Outcome.LOSE;
         if (otherMove == Move.NONE)
@@ -163,7 +168,7 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         // Sender hasn't revealed before + other player has revelead or not
         require(revealed == Status.NONE || revealed == Status.OTHER);
         // Sender reveals
-        require(games[key].secretMove == keccak256(move, secret));
+        require(games[key].secretMove == hashMove(move, secret));
         games[key].move = move;
         games[key].updatedAt = block.timestamp;
         LogReveal(msg.sender, with, move);
@@ -178,7 +183,7 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         require(played == Status.BOTH);
         // Both must have revealed
         require(revealed == Status.BOTH);
-        var outcome = _getOutcome(games[key].move, games[otherKey].move);
+        var outcome = getOutcome(games[key].move, games[otherKey].move);
         uint total = games[key].value + games[otherKey].value;
         if (outcome == Outcome.WIN) {
             asyncSend(msg.sender, total);
