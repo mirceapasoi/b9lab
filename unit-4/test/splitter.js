@@ -1,6 +1,7 @@
 const Splitter = artifacts.require("Splitter");
 const HasNoEther = artifacts.require("HasNoEther");
-const { assertError, assertResult, getAndClearGas } = require('./util.js');
+import { assertOkTx, getAndClearGas } from './util';
+import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
 
 const getBalances = (addresses) => {
     let result = [];
@@ -25,8 +26,7 @@ const testSplit = async (contract, A, B, C, call) => {
 
     // make call
     try {
-        let result = await call;
-        assertResult(result);
+        let result = await assertOkTx(call);
         // print logs from call
         for (let log of result.logs) {
             let value = web3.fromWei(log.args.value, "ether").toNumber();
@@ -42,16 +42,14 @@ const testSplit = async (contract, A, B, C, call) => {
     // withdraw
     let bError, cError;
     try {
-        let r = await contract.withdrawPayments({from: B});
-        assertResult(r);
+        await assertOkTx(contract.withdrawPayments({from: B}));
         web3.eth.getBalance(B).should.be.bignumber.above(before[2]);
     } catch (error) {
         console.debug(`B withdrawal: ${error.message}`);
         bError = error;
     }
     try {
-        let r = await contract.withdrawPayments({from: C});
-        assertResult(r);
+        await assertOkTx(contract.withdrawPayments({from: C}));
         web3.eth.getBalance(C).should.be.bignumber.above(before[3]);
     } catch (error) {
         console.debug(`C withdrawal: ${error.message}`);
@@ -97,46 +95,27 @@ contract("Splitter", (accounts) => {
     // Destroyable
     it("should be killed by owner", async () => {
         assert.notEqual(web3.eth.getCode(contract.address), "0x0");
-        let result = await contract.destroy({from: owner});
-        assertResult(result);
+        await assertOkTx(contract.destroy({from: owner}));
         assert.strictEqual(web3.eth.getCode(contract.address), "0x0");
     });
 
     it("should not be killed by others", async () => {
-        try {
-            let r = await contract.destroy({from: A});
-            assertResult(r);
-        } catch (error) {
-            assertError(error);
-        }
+        await assertRevert(contract.destroy({from: A}));
     });
 
     // Pausable
     it("should be paused/unpaused by owner", async () => {
-        let result = await contract.pause({from: owner});
-        assertResult(result);
-        result = await contract.unpause({from: owner});
-        assertResult(result);
+        await assertOkTx(contract.pause({from: owner}));
+        await assertOkTx(contract.unpause({from: owner}));
     });
 
     it("should not be paused by others", async () => {
-        try {
-            let r = await contract.pause({from: A});
-            assertResult(r);
-        } catch (error) {
-            assertError(error);
-        }
+        await assertRevert(contract.pause({from: A}));
     });
 
     it("should not split() when paused", async () => {
-        let r = await contract.pause({from: owner});
-        assertResult(r);
-        try {
-            let r = await contract.split(B, C, {from: A, value: twoUnits});
-            assertResult(r);
-        } catch (error) {
-            assertError(error);
-        }
+        await assertOkTx(contract.pause({from: owner}));
+        await assertRevert(contract.split(B, C, {from: A, value: twoUnits}));
     });
 
     // Split
