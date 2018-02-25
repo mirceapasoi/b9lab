@@ -8,8 +8,13 @@ const encode = (move, secret) => {
     // Move is 0, 1, 2, 3. Since we're using enums it gets encoded as uint8, so
     // we need to pad it with one zero.
     let packed = "0x0" + move.toString();
-    // Add secret string, but remove 0x
-    packed += web3.fromAscii(secret).slice(2);
+    // Add secret string, remove 0x
+    let packedSecret = web3.fromAscii(secret).slice(2);
+    // secret is bytes32, so we pack it as 64 hex digits
+    while (packedSecret.length < 64) {
+        packedSecret += '0';
+    }
+    packed += packedSecret;
     return web3.sha3(packed, {encoding: 'hex'});
 }
 
@@ -48,18 +53,18 @@ contract("RockPaperScissors", (accounts) => {
         assert.equal(secretB, encodeB);
     });
 
-    it("should let you withdraw after 1 hour", async () => {
+    it("should let you withdraw after 8 hours", async () => {
         // A enrolls
         await assertOkTx(contract.enroll(B, {from: A, value: valueA}));
         // 59 minutes
-        await increaseTimeTo(startTime + duration.minutes(59));
+        await increaseTimeTo(startTime + duration.hours(7) + duration.minutes(59));
         // Can't cancel or reward
         await assertRevert(contract.cancel(B, {from: A}));
         await assertRevert(contract.cancel(A, {from: B}));
         await assertRevert(contract.rewardWinner(B, {from: A}));
         await assertRevert(contract.rewardWinner(A, {from: B}));
         // 61 minutes
-        await increaseTimeTo(startTime + duration.minutes(61));
+        await increaseTimeTo(startTime + duration.hours(8) + duration.minutes(1));
         await assertOkTx(contract.cancel(B, {from: A}));
         await checkBalances(valueA, 0);
     });

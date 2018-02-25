@@ -8,15 +8,14 @@ import 'zeppelin-solidity/contracts/payment/PullPayment.sol';
 contract RockPaperScissors is Pausable, Destructible, PullPayment {
     enum Move { NONE, ROCK, PAPER, SCISSORS }
     enum Status { NONE, SENDER, OTHER, BOTH }
-    enum Outcome { TIE, WIN, LOSE }
+    enum Outcome { TIE, WIN, LOSE, CANCEL }
 
-    uint constant CANCEL_AFTER = 1 hours;
-    uint constant FORFEIT_AFTER = 8 hours;
+    uint constant CANCEL_AFTER = 8 hours;
 
-    event LogEnroll(address player1, address player2, uint value);
-    event LogPayment(address player1, address player2, uint value, bytes32 reason);
-    event LogPlay(address player1, address player2, bytes32 move);
-    event LogReveal(address player1, address player2, Move move);
+    event LogEnroll(address indexed player1, address indexed player2, uint value);
+    event LogPayment(address indexed player1, address indexed player2, uint value, Outcome reason);
+    event LogPlay(address indexed player1, address indexed player2, bytes32 move);
+    event LogReveal(address indexed player1, address indexed player2, Move indexed move);
 
     struct Game {
         uint updatedAt;
@@ -41,7 +40,7 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
     }
 
     // Called by player off-chain to hide their move
-    function hashMove(Move move, string secret) public pure returns (bytes32) {
+    function hashMove(Move move, bytes32 secret) public pure returns (bytes32) {
         return keccak256(move, secret);
     }
 
@@ -112,12 +111,12 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
             // Return funds
             uint value = games[key].value;
             asyncSend(msg.sender, value);
-            LogPayment(msg.sender, with, value, "cancel");
+            LogPayment(msg.sender, with, value, Outcome.CANCEL);
             _cleanGame(with);
             return;
         }
         // Both are enrolled - lock funds for at least 8 hour
-        var cutoff = (games[key].updatedAt > games[otherKey].updatedAt ? games[key].updatedAt : games[otherKey].updatedAt) + FORFEIT_AFTER;
+        var cutoff = (games[key].updatedAt > games[otherKey].updatedAt ? games[key].updatedAt : games[otherKey].updatedAt) + CANCEL_AFTER;
         require(block.timestamp > cutoff);
         uint total = games[key].value + games[otherKey].value;
         if (played == Status.NONE || (played == Status.BOTH && revealed == Status.NONE)) {
@@ -125,22 +124,22 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
             var (v1, v2) = (games[key].value, games[otherKey].value);
             asyncSend(msg.sender, v1);
             asyncSend(with, v2);
-            LogPayment(msg.sender, with, v1, "cancel");
-            LogPayment(with, msg.sender, v2, "cancel");
+            LogPayment(msg.sender, with, v1, Outcome.CANCEL);
+            LogPayment(with, msg.sender, v2, Outcome.CANCEL);
             _cleanGame(with);
             return;
         }
         if (played == Status.SENDER || (played == Status.BOTH && revealed == Status.SENDER)) {
             // sender gets all the money
             asyncSend(msg.sender, total);
-            LogPayment(msg.sender, with, total, "cancel");
+            LogPayment(msg.sender, with, total, Outcome.CANCEL);
             _cleanGame(with);
             return;
         }
         if (played == Status.OTHER || (played == Status.BOTH && revealed == Status.OTHER)) {
             // other gets all the money
             asyncSend(with, total);
-            LogPayment(with, msg.sender, total, "cancel");
+            LogPayment(with, msg.sender, total, Outcome.CANCEL);
             _cleanGame(with);
             return;
         }
@@ -159,7 +158,7 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         return true;
     }
 
-    function reveal(address with, Move move, string secret) external whenNotPaused returns (bool) {
+    function reveal(address with, Move move, bytes32 secret) external whenNotPaused returns (bool) {
         var (key, , enrolled, played, revealed) = getGameStatus(with);
         // Both must be enrolled
         require(enrolled == Status.BOTH);
@@ -187,16 +186,16 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         uint total = games[key].value + games[otherKey].value;
         if (outcome == Outcome.WIN) {
             asyncSend(msg.sender, total);
-            LogPayment(msg.sender, with, total, "win");
+            LogPayment(msg.sender, with, total, Outcome.WIN);
         } else if (outcome == Outcome.LOSE) {
             asyncSend(with, total);
-            LogPayment(with, msg.sender, total, "lose");
+            LogPayment(with, msg.sender, total, Outcome.LOSE);
         } else {
             var (v1, v2) = (games[key].value, games[otherKey].value);
             asyncSend(msg.sender, v1);
             asyncSend(with, v2);
-            LogPayment(msg.sender, with, v1, "tie");
-            LogPayment(with, msg.sender, v2, "tie");
+            LogPayment(msg.sender, with, v1, Outcome.TIE);
+            LogPayment(with, msg.sender, v2, Outcome.TIE);
         }
         // Clean-up
         _cleanGame(with);
