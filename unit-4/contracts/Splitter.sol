@@ -9,8 +9,7 @@ import 'zeppelin-solidity/contracts/ownership/HasNoEther.sol';
 contract Splitter is Pausable, Destructible, PullPayment {
     event LogSplit(address indexed a, address indexed b, address indexed c, uint value);
 
-    function Splitter() public {
-    }
+    function Splitter() public {}
 
     function split(address b, address c) external payable whenNotPaused returns (bool) {
         require(msg.value > 0); // must be non-zero

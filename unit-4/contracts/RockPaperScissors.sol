@@ -29,6 +29,8 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
 
     // Enrollment
     function enroll(address with) external payable whenNotPaused returns (bool) {
+        // don't play with yourself
+        require(msg.sender != with);
         // non-zero enrollment
         require(msg.value > 0);
         bytes32 game = keccak256(msg.sender, with);
@@ -45,6 +47,8 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
     }
 
     function getGameKeys(address with) public view whenNotPaused returns (bytes32, bytes32) {
+        // don't play with yourself
+        require(msg.sender != with);
         // Given two addresses A, B we hash "AB" as the key for "A wants to play with B",
         // and "BA" as the key for "B wants to play with A".
         // These keys are used for maintaining state in a mapping.
