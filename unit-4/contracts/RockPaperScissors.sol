@@ -12,43 +12,26 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
 
     uint constant CANCEL_AFTER = 8 hours;
 
-    event LogEnroll(address indexed player1, address indexed player2, uint value);
     event LogPayment(address indexed player1, address indexed player2, uint value, Outcome reason);
     event LogPlay(address indexed player1, address indexed player2, bytes32 move);
     event LogReveal(address indexed player1, address indexed player2, Move indexed move);
 
     struct Game {
-        uint updatedAt;
+        Move move;
+        uint32 updatedAt;
         uint value;
         bytes32 secretMove;
-        Move move;
     }
     mapping (bytes32 => Game) public games;
 
     function RockPaperScissors() public {}
 
-    // Enrollment
-    function enroll(address with) external payable whenNotPaused returns (bool) {
-        // don't play with yourself
-        require(msg.sender != with);
-        // non-zero enrollment
-        require(msg.value > 0);
-        bytes32 game = keccak256(msg.sender, with);
-        // can't enroll twice
-        require(games[game].updatedAt == 0);
-        games[game] = Game(block.timestamp, msg.value, 0, Move.NONE);
-        LogEnroll(msg.sender, with, msg.value);
-        return true;
-    }
-
     // Called by player off-chain to hide their move
-    function hashMove(Move move, bytes32 secret) public pure returns (bytes32) {
-        return keccak256(move, secret);
+    function hashMove(address player1, address player2, Move move, bytes32 secret) public pure returns (bytes32) {
+        return keccak256(player1, player2, move, secret);
     }
 
-    function getGameKeys(address with) public view whenNotPaused returns (bytes32, bytes32) {
-        // don't play with yourself
-        require(msg.sender != with);
+    function getGameKeys(address with) private view whenNotPaused returns (bytes32, bytes32) {
         // Given two addresses A, B we hash "AB" as the key for "A wants to play with B",
         // and "BA" as the key for "B wants to play with A".
         // These keys are used for maintaining state in a mapping.
@@ -57,33 +40,22 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         return (key, otherKey);
     }
 
-    function getGameStatus(address with) public view whenNotPaused returns (bytes32 key, bytes32 otherKey, Status enrolled, Status played, Status revealed) {
+    function getGameStatus(address with) private view whenNotPaused returns (Game storage g1, Game storage g2, Status played, Status revealed) {
         var (k1, k2) = getGameKeys(with);
-        key = k1;
-        otherKey = k2;
-        // Enrollment
-        var (g1, g2) = (games[k1].updatedAt, games[k2].updatedAt);
-        enrolled = g1 != 0 && g2 != 0 ? Status.BOTH : (g1 != 0 ? Status.SENDER : (g2 != 0 ? Status.OTHER : Status.NONE));
+        g1 = games[k1];
+        g2 = games[k2];
         // Secret play
-        if (enrolled == Status.BOTH) {
-            var (s1, s2) = (games[k1].secretMove, games[k2].secretMove);
-            played = s1 != 0 && s2 != 0 ? Status.BOTH : (s1 != 0 ? Status.SENDER : (s2 != 0 ? Status.OTHER : Status.NONE));
-        } else {
-            played = Status.NONE;
-        }
+        bytes32 s1 = g1.secretMove;
+        bytes32 s2 = g2.secretMove;
+        played = s1 != 0 && s2 != 0 ? Status.BOTH : (s1 != 0 ? Status.SENDER : (s2 != 0 ? Status.OTHER : Status.NONE));
         // Revelead play
         if (played == Status.BOTH) {
-            var (m1, m2) = (uint(games[k1].move), uint(games[k2].move));
+            uint8 m1 = uint8(g1.move);
+            uint8 m2 = uint8(g2.move);
             revealed = m1 != 0 && m2 != 0 ? Status.BOTH : (m1 != 0 ? Status.SENDER : (m2 != 0 ? Status.OTHER : Status.NONE));
         } else {
             revealed = Status.NONE;
         }
-    }
-
-    function _cleanGame(address with) private {
-        var (key, otherKey) = getGameKeys(with);
-        delete games[key];
-        delete games[otherKey];
     }
 
     function getOutcome(Move move, Move otherMove) public pure returns (Outcome) {
@@ -101,108 +73,110 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         return otherMove != Move.ROCK ? Outcome.WIN : Outcome.LOSE;
     }
 
+    function _cleanGame(address with) private {
+        var (k1, k2) = getGameKeys(with);
+        delete games[k1];
+        delete games[k2];
+    }
+
+    function _cancelGame(address with, uint v1, uint v2) private {
+        if (v1 != 0) {
+            asyncSend(msg.sender, v1);
+            LogPayment(msg.sender, with, v1, Outcome.CANCEL);
+        }
+        if (v2 != 0) {
+            asyncSend(with, v2);
+            LogPayment(with, msg.sender, v2, Outcome.CANCEL);
+        }
+        _cleanGame(with);
+    }
 
     function cancel(address with) external whenNotPaused {
-        var (key, otherKey, enrolled, played, revealed) = getGameStatus(with);
+        var (game, otherGame, played, revealed) = getGameStatus(with);
         // If game is done, one of the players should call rewardWinner()
-        require(enrolled != Status.BOTH || played != Status.BOTH || revealed != Status.BOTH);
-        // Can't cancel if you didn't enroll in the game
-        require(enrolled == Status.SENDER || enrolled == Status.BOTH);
-        // Sender is the only one who enrolled i.e. other player hasn't enrolled
-        if (enrolled == Status.SENDER) {
-            // Lock funds for at least 1 hour
-            require(block.timestamp > games[key].updatedAt + CANCEL_AFTER);
+        require(played != Status.BOTH || revealed != Status.BOTH);
+        // Can't cancel if you didn't play in the game
+        require(played == Status.SENDER || played == Status.BOTH);
+        // Game data
+        uint32 t1 = game.updatedAt;
+        uint v1 = game.value;
+        // Sender is the only one who played i.e. other player hasn't played
+        if (played == Status.SENDER) {
+            // Lock funds for at least 8 hour
+            require(block.timestamp > t1 + CANCEL_AFTER);
             // Return funds
-            uint value = games[key].value;
-            asyncSend(msg.sender, value);
-            LogPayment(msg.sender, with, value, Outcome.CANCEL);
-            _cleanGame(with);
-            return;
-        }
-        // Both are enrolled - lock funds for at least 8 hour
-        var cutoff = (games[key].updatedAt > games[otherKey].updatedAt ? games[key].updatedAt : games[otherKey].updatedAt) + CANCEL_AFTER;
-        require(block.timestamp > cutoff);
-        uint total = games[key].value + games[otherKey].value;
-        if (played == Status.NONE || (played == Status.BOTH && revealed == Status.NONE)) {
-            // both get money back
-            var (v1, v2) = (games[key].value, games[otherKey].value);
-            asyncSend(msg.sender, v1);
-            asyncSend(with, v2);
-            LogPayment(msg.sender, with, v1, Outcome.CANCEL);
-            LogPayment(with, msg.sender, v2, Outcome.CANCEL);
-            _cleanGame(with);
-            return;
-        }
-        if (played == Status.SENDER || (played == Status.BOTH && revealed == Status.SENDER)) {
-            // sender gets all the money
-            asyncSend(msg.sender, total);
-            LogPayment(msg.sender, with, total, Outcome.CANCEL);
-            _cleanGame(with);
-            return;
-        }
-        if (played == Status.OTHER || (played == Status.BOTH && revealed == Status.OTHER)) {
-            // other gets all the money
-            asyncSend(with, total);
-            LogPayment(with, msg.sender, total, Outcome.CANCEL);
-            _cleanGame(with);
-            return;
+            _cancelGame(with, v1, 0);
+        } else {
+            uint32 t2 = otherGame.updatedAt;
+            uint v2 = otherGame.value;
+            // Both have played - lock funds for at least 8 hour
+            require(block.timestamp > (t1 > t2 ? t1 : t2) + CANCEL_AFTER);
+            if (revealed == Status.NONE) {
+                // both get money back
+                _cancelGame(with, v1, v2);
+            } else if (revealed == Status.SENDER) {
+                // sender gets all the money
+                _cancelGame(with, v1 + v2, 0);
+            } else if (revealed == Status.OTHER) {
+                // other gets all the money
+                _cancelGame(with, 0, v1 + v2);
+            }
         }
     }
 
-    function play(address with, bytes32 secretMove) external whenNotPaused returns (bool) {
-        var (key, , enrolled, played, ,) = getGameStatus(with);
-        // Both must be enrolled
-        require(enrolled == Status.BOTH);
+    function play(address with, bytes32 secretMove) external whenNotPaused payable {
+        // don't play with yourself
+        require(msg.sender != with);
+        // non-zero play
+        require(msg.value > 0);
+        // Check game
+        var (game, , played, ,) = getGameStatus(with);
         // Sender hasn't played before + other player has played or not
         require(played == Status.NONE || played == Status.OTHER);
+        // Sender hasn't played this move before
         // Sender plays in secret
-        games[key].secretMove = secretMove;
-        games[key].updatedAt = block.timestamp;
+        game.updatedAt = uint32(block.timestamp);
+        game.value = msg.value;
+        game.secretMove = secretMove;
         LogPlay(msg.sender, with, secretMove);
-        return true;
     }
 
-    function reveal(address with, Move move, bytes32 secret) external whenNotPaused returns (bool) {
-        var (key, , enrolled, played, revealed) = getGameStatus(with);
-        // Both must be enrolled
-        require(enrolled == Status.BOTH);
+    function reveal(address with, Move move, bytes32 secret) external whenNotPaused {
+        var (game, , played, revealed) = getGameStatus(with);
         // Both must have played secretly
         require(played == Status.BOTH);
         // Sender hasn't revealed before + other player has revelead or not
         require(revealed == Status.NONE || revealed == Status.OTHER);
         // Sender reveals
-        require(games[key].secretMove == hashMove(move, secret));
-        games[key].move = move;
-        games[key].updatedAt = block.timestamp;
+        require(game.secretMove == hashMove(msg.sender, with, move, secret));
+        game.move = move;
+        game.updatedAt = uint32(block.timestamp);
         LogReveal(msg.sender, with, move);
-        return true;
     }
 
-    function rewardWinner(address with) external whenNotPaused returns (Outcome) {
-        var (key, otherKey, enrolled, played, revealed) = getGameStatus(with);
-        // Both must be enrolled
-        require(enrolled == Status.BOTH);
+    function rewardWinner(address with) external whenNotPaused {
+        var (game, otherGame, played, revealed) = getGameStatus(with);
         // Both must have played secretly
         require(played == Status.BOTH);
         // Both must have revealed
         require(revealed == Status.BOTH);
-        var outcome = getOutcome(games[key].move, games[otherKey].move);
-        uint total = games[key].value + games[otherKey].value;
+        Outcome outcome = getOutcome(game.move, otherGame.move);
+        uint total = game.value + otherGame.value;
         if (outcome == Outcome.WIN) {
             asyncSend(msg.sender, total);
-            LogPayment(msg.sender, with, total, Outcome.WIN);
+            LogPayment(msg.sender, with, total, outcome);
         } else if (outcome == Outcome.LOSE) {
             asyncSend(with, total);
-            LogPayment(with, msg.sender, total, Outcome.LOSE);
+            LogPayment(with, msg.sender, total, outcome);
         } else {
-            var (v1, v2) = (games[key].value, games[otherKey].value);
+            uint v1 = game.value;
+            uint v2 = otherGame.value;
             asyncSend(msg.sender, v1);
             asyncSend(with, v2);
-            LogPayment(msg.sender, with, v1, Outcome.TIE);
-            LogPayment(with, msg.sender, v2, Outcome.TIE);
+            LogPayment(msg.sender, with, v1, outcome);
+            LogPayment(with, msg.sender, v2, outcome);
         }
         // Clean-up
         _cleanGame(with);
-        return outcome;
     }
 }

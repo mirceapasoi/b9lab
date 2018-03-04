@@ -4,30 +4,14 @@ import { increaseTimeTo, duration } from 'zeppelin-solidity/test/helpers/increas
 import latestTime from 'zeppelin-solidity/test/helpers/latestTime';
 import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
 
-const encode = (move, secret) => {
-    // Move is 0, 1, 2, 3. Since we're using enums it gets encoded as uint8, so
-    // we need to pad it with one zero.
-    let packed = "0x0" + move.toString();
-    // Add secret string, remove 0x
-    let packedSecret = web3.fromAscii(secret).slice(2);
-    // secret is bytes32, so we pack it as 64 hex digits
-    while (packedSecret.length < 64) {
-        packedSecret += '0';
-    }
-    packed += packedSecret;
-    return web3.sha3(packed, {encoding: 'hex'});
-}
-
 contract("RockPaperScissors", (accounts) => {
-    var contract, startTime;
+    var contract, startTime, secretA, secretB;
     var owner = accounts[1];
     var A = accounts[2];
     var B = accounts[3];
     const valueA = web3.toWei(200, "finney");
     const valueB = web3.toWei(400, "finney");
     const valueAB = web3.toWei(600, "finney");
-    const secretA = encode(2, "playerA");
-    const secretB = encode(1, "playerB");
 
     const checkBalances = async (a, b) => {
         let balanceA = await contract.payments(A, {from: A});
@@ -44,18 +28,13 @@ contract("RockPaperScissors", (accounts) => {
     beforeEach("new contract", async () => {
         contract = await RockPaperScissors.new({from: owner});
         startTime = latestTime();
-    });
-
-    it("should hash moves", async () => {
-        let encodeA = await contract.hashMove(2, "playerA");
-        let encodeB = await contract.hashMove(1, "playerB");
-        assert.equal(secretA, encodeA);
-        assert.equal(secretB, encodeB);
+        secretA = await contract.hashMove.call(A, B, 2, "playerA");
+        secretB = await contract.hashMove.call(B, A, 1, "playerB");
     });
 
     it("should let you withdraw after 8 hours", async () => {
-        // A enrolls
-        await assertOkTx(contract.enroll(B, {from: A, value: valueA}));
+        // A plays in secret (PAPER)
+        await assertOkTx(contract.play(B, secretA, {from: A, value: valueA}));
         // 59 minutes
         await increaseTimeTo(startTime + duration.hours(7) + duration.minutes(59));
         // Can't cancel or reward
@@ -69,13 +48,13 @@ contract("RockPaperScissors", (accounts) => {
         await checkBalances(valueA, 0);
     });
 
-    it("shouldn't let anybody withdraw for 8 hours after both enrolled", async () => {
-        // A enrolls
-        await assertOkTx(contract.enroll(B, {from: A, value: valueA}));
+    it("shouldn't let anybody withdraw for 8 hours after both played", async () => {
+        // A plays in secret (PAPER)
+        await assertOkTx(contract.play(B, secretA, {from: A, value: valueA}));
         // 1 hour delay
         await increaseTimeTo(startTime + duration.hours(1));
-        // B enrolls
-        await assertOkTx(contract.enroll(A, {from: B, value: valueB}));
+        // B plays in secret (ROCK)
+        await assertOkTx(contract.play(A, secretB, {from: B, value: valueB}));
         // almost 8 more hours
         await increaseTimeTo(startTime + duration.hours(8) + duration.minutes(59));
         // Try to withdraw
@@ -90,37 +69,12 @@ contract("RockPaperScissors", (accounts) => {
         await checkBalances(valueA, valueB);
     });
 
-    it("should let player withdraw after one played & other didn't for 8 hours", async () => {
-        // A enrolls
-        await assertOkTx(contract.enroll(B, {from: A, value: valueA}));
-        // B enrolls
-        await assertOkTx(contract.enroll(A, {from: B, value: valueB}));
-        // B plays in secret (ROCK)
-        await assertOkTx(contract.play(A, secretB, {from: B}));
-        // almost 8 more hours
-        await increaseTimeTo(startTime + duration.hours(7) + duration.minutes(59));
-        // Try to withdraw
-        await assertRevert(contract.cancel(A, {from: B}));
-        await assertRevert(contract.cancel(B, {from: A}));
-        await assertRevert(contract.rewardWinner(B, {from: A}));
-        await assertRevert(contract.rewardWinner(A, {from: B}));
-        // 8 hours and 1 minute
-        await increaseTimeTo(startTime + duration.hours(8) + duration.minutes(1));
-        // A cancels game
-        await assertOkTx(contract.cancel(B, {from: A}));
-        // B gets the money
-        await checkBalances(0, valueAB);
-    });
 
     it("should let player withdraw after one revealed & other didn't for 8 hours", async () => {
-        // A enrolls
-        await assertOkTx(contract.enroll(B, {from: A, value: valueA}));
-        // B enrolls
-        await assertOkTx(contract.enroll(A, {from: B, value: valueB}));
-        // B plays in secret (ROCK)
-        await assertOkTx(contract.play(A, secretB, {from: B}));
         // A plays in secret (PAPER)
-        await assertOkTx(contract.play(B, secretA, {from: A}));
+        await assertOkTx(contract.play(B, secretA, {from: A, value: valueA}));
+        // A plays in secret (PAPER)
+        await assertOkTx(contract.play(A, secretB, {from: B, value: valueB}));
         // A reveals
         await assertOkTx(contract.reveal(B, 2, "playerA", {from: A}));
         // almost 8 more hours
@@ -139,19 +93,10 @@ contract("RockPaperScissors", (accounts) => {
     });
 
     it("should play", async () => {
-        // A enrolls
-        await assertOkTx(contract.enroll(B, {from: A, value: valueA}));
-        // B enrolls
-        await assertOkTx(contract.enroll(A, {from: B, value: valueB}));
-        // Can't cancel or reward
-        await assertRevert(contract.cancel(B, {from: A}));
-        await assertRevert(contract.cancel(A, {from: B}));
-        await assertRevert(contract.rewardWinner(B, {from: A}));
-        await assertRevert(contract.rewardWinner(A, {from: B}));
         // B plays in secret (ROCK)
-        await assertOkTx(contract.play(A, secretB, {from: B}));
+        await assertOkTx(contract.play(A, secretB, {from: B, value: valueB}));
         // A plays in secret (PAPER)
-        await assertOkTx(contract.play(B, secretA, {from: A}));
+        await assertOkTx(contract.play(B, secretA, {from: A, value: valueA}));
         // Can't cancel or reward
         await assertRevert(contract.cancel(B, {from: A}));
         await assertRevert(contract.cancel(A, {from: B}));

@@ -11,7 +11,7 @@ contract Splitter is Pausable, Destructible, PullPayment {
 
     function Splitter() public {}
 
-    function split(address b, address c) external payable whenNotPaused returns (bool) {
+    function split(address b, address c) external payable whenNotPaused {
         require(msg.value > 0); // must be non-zero
         require(msg.value % 2 == 0); // must be divisible
         require(b != address(0)); // must exist
@@ -20,6 +20,5 @@ contract Splitter is Pausable, Destructible, PullPayment {
         asyncSend(b, halfValue);
         asyncSend(c, halfValue);
         LogSplit(msg.sender, b, c, halfValue);
-        return true;
     }
 }
