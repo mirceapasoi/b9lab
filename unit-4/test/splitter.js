@@ -1,67 +1,6 @@
 const Splitter = artifacts.require("Splitter");
-const HasNoEther = artifacts.require("HasNoEther");
 import { assertOkTx, getAndClearGas } from './util';
 import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
-
-const getBalances = (addresses) => {
-    let result = [];
-    for (let addr of addresses) {
-        let b = web3.eth.getBalance(addr);
-        result.push(b);
-    }
-    return result;
-}
-
-const printBalances = (prefix, addresses, unit = "ether") => {
-    const balances = getBalances(addresses);
-    console.debug(prefix, balances.map(b => web3.fromWei(b, unit).toNumber()).join('\t'));
-    return balances;
-}
-
-// Test split
-const testSplit = async (contract, A, B, C, call) => {
-    const addresses = [contract.address, A, B, C];
-    // get before balances
-    const before = printBalances('Before:', addresses);
-
-    // make call
-    try {
-        let result = await assertOkTx(call);
-        // print logs from call
-        for (let log of result.logs) {
-            let value = web3.fromWei(log.args.value, "ether").toNumber();
-            console.debug(log.event, value);
-        }
-    } catch (error) {
-        console.error(error.message);
-        throw error;
-    }
-
-    web3.eth.getBalance(A).should.be.bignumber.below(before[1]);
-
-    // withdraw
-    let bError, cError;
-    try {
-        await assertOkTx(contract.withdrawPayments({from: B}));
-        web3.eth.getBalance(B).should.be.bignumber.above(before[2]);
-    } catch (error) {
-        console.debug(`B withdrawal: ${error.message}`);
-        bError = error;
-    }
-    try {
-        await assertOkTx(contract.withdrawPayments({from: C}));
-        web3.eth.getBalance(C).should.be.bignumber.above(before[3]);
-    } catch (error) {
-        console.debug(`C withdrawal: ${error.message}`);
-        cError = error;
-    }
-
-    // get after balances
-    printBalances('After:', addresses);
-
-    return [bError, cError];
-}
-
 
 contract("Splitter", (accounts) => {
     var contract, noEther;
@@ -72,10 +11,14 @@ contract("Splitter", (accounts) => {
     const oneUnit = web3.toWei(100, "finney");
     const twoUnits = web3.toWei(200, "finney");
 
-    before("set ether trap", async () => {
-        // setup contract that refuses to accept ether
-        noEther = await HasNoEther.new({from: owner});
-    })
+    const checkBalances = async (a, b, c) => {
+        let balanceA = await contract.payments(A, {from: A});
+        balanceA.should.be.bignumber.equal(a);
+        let balanceB = await contract.payments(B, {from: B});
+        balanceB.should.be.bignumber.equal(b);
+        let balanceC = await contract.payments(C, {from: C});
+        balanceC.should.be.bignumber.equal(c);
+    }
 
     afterEach("print gas", () => {
         let gasUsed = getAndClearGas();
@@ -120,13 +63,8 @@ contract("Splitter", (accounts) => {
 
     // Split
     it("split() when A sends ETH", async () => {
-        await testSplit(contract, A, B, C, contract.split(B, C, {from: A, value: oneUnit}));
-    });
-
-    it("should not eat ETH and allow refunds", async () => {
-        let C = noEther.address;
-        const [bError, cError] = await testSplit(contract, A, B, C, contract.split(B, C, {from: A, value: twoUnits}));
-        assert.isNotOk(bError);
-        assert.include(cError.message, 'unlock', "contract din't throw");
+        // A splits between B & C
+        await assertOkTx(contract.split(B, C, {from: A, value: twoUnits}));
+        await checkBalances(0, oneUnit, oneUnit);
     });
 });

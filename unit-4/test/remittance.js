@@ -31,16 +31,16 @@ contract("Remittance", (accounts) => {
     });
 
     it("A deposits for B, B unlocks", async () => {
-        let id = await contract.encode.call(A, B, "secret1", "secret2");
+        let id = await contract.encode.call(B, "secret1", "secret2");
         // A deposits for B or C
         let until = startTime + duration.hours(3);
         await assertOkTx(contract.deposit(id, B, until, {value: valueA, from: A}));
         // A tries do to another deposit with the same id
         await assertRevert(contract.deposit(id, B, until, {value: valueB, from: A}));
         // Even if somebody else steals the secrets, they still can't unlock
-        await assertRevert(contract.unlock(id, "secret1", "secret2", {from: owner}));
+        await assertRevert(contract.unlock("secret1", "secret2", {from: owner}));
         // B unlocks
-        await assertOkTx(contract.unlock(id, "secret1", "secret2", {from: B}));
+        await assertOkTx(contract.unlock("secret1", "secret2", {from: B}));
         // B got paid
         await checkBalances(0, valueA, 0);
         // Can't re-use id
@@ -50,7 +50,7 @@ contract("Remittance", (accounts) => {
     it("A deposits for B, A reclaims", async () => {
         // A deposits for B or C
         let until = startTime + duration.hours(3);
-        let id = await contract.encode.call(A, B, "secret1", "secret2");
+        let id = await contract.encode.call(B, "secret1", "secret2");
         await assertOkTx(contract.deposit(id, B, until, {value: valueA, from: A}));
         // 1 minute before deadline
         await increaseTimeTo(startTime + duration.hours(2) + duration.minutes(59));
