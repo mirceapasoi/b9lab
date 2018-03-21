@@ -3,7 +3,7 @@ import { assertOkTx, getAndClearGas } from './util';
 import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
 
 contract("Splitter", (accounts) => {
-    var contract, noEther;
+    var contract;
     var owner = accounts[1];
     var A = accounts[2];
     var B = accounts[3];

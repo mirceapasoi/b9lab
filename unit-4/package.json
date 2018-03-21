@@ -1,5 +1,5 @@
 {
-  "name": "splitter",
+  "name": "unit-4",
   "version": "1.0.0",
   "description": "",
   "main": "truffle-config.js",
@@ -12,11 +12,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "truffle": "^4.1.0",
+    "babel-polyfill": "^6.26.0",
+    "truffle": "^4.1.3",
     "zeppelin-solidity": "^1.7.0"
   },
   "devDependencies": {
-    "babel-polyfill": "^6.26.0",
     "babel-preset-env": "^1.6.1",
     "babel-preset-es2015": "^6.24.1",
     "babel-preset-stage-2": "^6.24.1",
