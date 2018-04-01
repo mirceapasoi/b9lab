@@ -1,5 +1,5 @@
 const Splitter = artifacts.require("Splitter");
-import { assertOkTx, getAndClearGas } from './util';
+import { assertOkTx, getAndClearGas, measureTx } from './util';
 import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
 
 contract("Splitter", (accounts) => {
@@ -21,12 +21,13 @@ contract("Splitter", (accounts) => {
     }
 
     afterEach("print gas", () => {
-        let gasUsed = getAndClearGas();
-        console.log(`${gasUsed.toLocaleString()} gas used`);
+        console.log(`Test: ${getAndClearGas().toLocaleString()} gas used`);
     })
 
     beforeEach("new contract", async () => {
         contract = await Splitter.new({from: owner});
+        await measureTx(contract.transactionHash);
+        console.log(`Setup: ${getAndClearGas().toLocaleString()} gas used`);
     })
 
     // Ownable

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.21;
 
 contract ERC725 {
     // 1: MANAGEMENT keys, which can manage the identity
@@ -18,12 +18,6 @@ contract ERC725 {
     event ExecutionRequested(uint256 indexed executionId, address indexed to, uint256 indexed value, bytes data);
     event Executed(uint256 indexed executionId, address indexed to, uint256 indexed value, bytes data);
     event Approved(uint256 indexed executionId, bool approved);
-
-    struct Key {
-        uint256 purpose; //e.g., MANAGEMENT_KEY = 1, ACTION_KEY = 2, etc.
-        uint256 keyType; // e.g. 1 = ECDSA, 2 = RSA, etc.
-        bytes32 key; // for non-hex and long keys, its the Keccak256 hash of the key
-    }
 
     function getKey(bytes32 _key, uint256 _purpose) public view returns(uint256 purpose, uint256 keyType, bytes32 key);
     function getKeyPurpose(bytes32 _key) public view returns(uint256[] purpose);

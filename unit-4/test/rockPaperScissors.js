@@ -1,5 +1,5 @@
 const RockPaperScissors = artifacts.require("RockPaperScissors");
-import { assertOkTx, getAndClearGas } from './util';
+import { assertOkTx, getAndClearGas, measureTx } from './util';
 import { increaseTimeTo, duration } from 'zeppelin-solidity/test/helpers/increaseTime';
 import latestTime from 'zeppelin-solidity/test/helpers/latestTime';
 import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
@@ -26,17 +26,18 @@ contract("RockPaperScissors", (accounts) => {
     }
 
     afterEach("print gas", () => {
-        let gasUsed = getAndClearGas();
-        console.log(`${gasUsed.toLocaleString()} gas used`);
+        console.log(`Test: ${getAndClearGas().toLocaleString()} gas used`);
     });
 
     beforeEach("new contract", async () => {
         contract = await RockPaperScissors.new({from: owner});
+        await measureTx(contract.transactionHash);
         startTime = latestTime();
         // A plays in secret (PAPER)
         secretA = await contract.hashMove.call(A, B, Move.PAPER, "playerA");
         // B plays in secret (ROCK)
         secretB = await contract.hashMove.call(B, A, Move.ROCK, "playerB");
+        console.log(`Setup: ${getAndClearGas().toLocaleString()} gas used`);
     });
 
     it("should let player 1 withdraw after 8 hours", async () => {

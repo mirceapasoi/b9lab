@@ -1,5 +1,5 @@
 const Remittance = artifacts.require("Remittance");
-import { assertOkTx, getAndClearGas } from './util';
+import { assertOkTx, getAndClearGas, measureTx } from './util';
 import { increaseTimeTo, duration } from 'zeppelin-solidity/test/helpers/increaseTime';
 import latestTime from 'zeppelin-solidity/test/helpers/latestTime';
 import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
@@ -22,12 +22,14 @@ contract("Remittance", (accounts) => {
 
     afterEach("print gas", () => {
         let gasUsed = getAndClearGas();
-        console.log(`${gasUsed.toLocaleString()} gas used`);
+        console.log(`Test: ${getAndClearGas().toLocaleString()} gas used`);
     });
 
     beforeEach("new contract", async () => {
         contract = await Remittance.new({from: owner});
+        await measureTx(contract.transactionHash);
         startTime = latestTime();
+        console.log(`Setup: ${getAndClearGas().toLocaleString()} gas used`);
     });
 
     it("A deposits for B, B unlocks", async () => {
