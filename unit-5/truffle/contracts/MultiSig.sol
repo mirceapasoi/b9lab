@@ -12,8 +12,8 @@ contract MultiSig is Pausable, ERC725 {
         bytes data;
         uint256 needsApprove;
     }
-    mapping (uint256 => Execution) execution;
-    mapping (uint256 => address[]) approved;
+    mapping (uint256 => Execution) public execution;
+    mapping (uint256 => address[]) public approved;
 
     function changeManagementThreshold(uint threshold)
         public
@@ -56,14 +56,26 @@ contract MultiSig is Pausable, ERC725 {
         uint index;
         uint threshold;
         if (_to == address(this)) {
-            // Only management keys can operate on this contract
-            (index, found) = allKeys.findAddr(msg.sender, MANAGEMENT_KEY);
-            threshold = managementThreshold;
+            if (msg.sender == address(this)) {
+                // Contract calling itself
+                found = true;
+                threshold = managementThreshold;
+            } else {
+                // Only management keys can operate on this contract
+                (index, found) = allKeys.findAddr(msg.sender, MANAGEMENT_KEY);
+                threshold = managementThreshold - 1;
+            }
         } else {
             require(_to != address(0));
-            // Action keys can operate on other addresses
-            (index, found) = allKeys.findAddr(msg.sender, ACTION_KEY);
-            threshold = actionThreshold;
+            if (msg.sender == address(this)) {
+                // Contract calling itself
+                found = true;
+                threshold = actionThreshold;
+            } else {
+                // Action keys can operate on other addresses
+                (index, found) = allKeys.findAddr(msg.sender, ACTION_KEY);
+                threshold = actionThreshold - 1;
+            }
         }
         require(found);
 
@@ -72,8 +84,8 @@ contract MultiSig is Pausable, ERC725 {
         emit ExecutionRequested(executionId, _to, _value, _data);
         nonce++;
 
-        Execution memory e = Execution(_to, _value, _data, threshold - 1);
-        if (threshold == 1) {
+        Execution memory e = Execution(_to, _value, _data, threshold);
+        if (threshold == 0) {
             // One approval is enough, execute directly
             _execute(executionId, e, false);
         } else {
@@ -91,12 +103,13 @@ contract MultiSig is Pausable, ERC725 {
         // Must exist
         require(e.to != 0);
         // Call
+        // TODO: Should we also support DelegateCall and Create (new contract)?
         bool success = e.to.call.value(e.value)(e.data);
-        emit Executed(_id, e.to, e.value, e.data);
-        // TODO: Log failures
         if (!success) {
+            emit ExecutionFailed(_id, e.to, e.value, e.data);
             return false;
         }
+        emit Executed(_id, e.to, e.value, e.data);
         // Clean up
         if (!clean) {
             return true;
@@ -111,6 +124,7 @@ contract MultiSig is Pausable, ERC725 {
         whenNotPaused
         returns (bool success)
     {
+        require(_id != 0);
         Execution storage e = execution[_id];
         // Must exist
         require(e.to != 0);
