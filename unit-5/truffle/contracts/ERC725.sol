@@ -1,6 +1,19 @@
 pragma solidity ^0.4.21;
 
-contract ERC725 {
+import "./ERC165.sol";
+
+contract ERC725 is ERC165 {
+    function ERC725ID() public pure returns (bytes4) {
+        return (
+            this.getKey.selector ^ this.getKeyPurpose.selector ^ this.getKeysByPurpose.selector ^
+            this.addKey.selector ^ this.execute.selector ^ this.approve.selector ^ this.removeKey.selector
+        );
+    }
+
+    function ERC725() internal {
+        supportedInterfaces[ERC725ID()] = true;
+    }
+
     // Purpose
     // 1: MANAGEMENT keys, which can manage the identity
     uint256 constant MANAGEMENT_KEY = 1;
