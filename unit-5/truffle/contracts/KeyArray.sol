@@ -7,14 +7,6 @@ library KeyArray {
         bytes32 key; // for non-hex and long keys, its the Keccak256 hash of the key
     }
 
-    function findAddr(Key[] storage self, address addr, uint256 purpose)
-        internal
-        view
-        returns (uint, bool)
-    {
-        return find(self, keccak256(addr), purpose);
-    }
-
     function find(Key[] storage self, bytes32 key, uint256 purpose)
         internal
         view

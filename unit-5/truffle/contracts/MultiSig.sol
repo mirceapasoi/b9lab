@@ -39,12 +39,12 @@ contract MultiSig is Pausable, ERC725 {
         actionThreshold = threshold;
     }
 
-    function getExecutionId(address _to, uint256 _value, bytes _data)
+    function getExecutionId(address self, address _to, uint256 _value, bytes _data, uint _nonce)
         internal
-        view
+        pure
         returns (uint256)
     {
-        return uint(keccak256(this, _to, _value, _data, nonce));
+        return uint(keccak256(self, _to, _value, _data, _nonce));
     }
 
     function execute(address _to, uint256 _value, bytes _data)
@@ -62,7 +62,7 @@ contract MultiSig is Pausable, ERC725 {
                 threshold = managementThreshold;
             } else {
                 // Only management keys can operate on this contract
-                (index, found) = allKeys.findAddr(msg.sender, MANAGEMENT_KEY);
+                (index, found) = allKeys.find(addrToKey(msg.sender), MANAGEMENT_KEY);
                 threshold = managementThreshold - 1;
             }
         } else {
@@ -73,14 +73,14 @@ contract MultiSig is Pausable, ERC725 {
                 threshold = actionThreshold;
             } else {
                 // Action keys can operate on other addresses
-                (index, found) = allKeys.findAddr(msg.sender, ACTION_KEY);
+                (index, found) = allKeys.find(addrToKey(msg.sender), ACTION_KEY);
                 threshold = actionThreshold - 1;
             }
         }
         require(found);
 
         // Generate id and increment nonce
-        executionId = getExecutionId(_to, _value, _data);
+        executionId = getExecutionId(address(this), _to, _value, _data, nonce);
         emit ExecutionRequested(executionId, _to, _value, _data);
         nonce++;
 
@@ -133,9 +133,9 @@ contract MultiSig is Pausable, ERC725 {
         bool found;
         uint index;
         if (e.to == address(this)) {
-            (index, found) = allKeys.findAddr(msg.sender, MANAGEMENT_KEY);
+            (index, found) = allKeys.find(addrToKey(msg.sender), MANAGEMENT_KEY);
         } else {
-            (index, found) = allKeys.findAddr(msg.sender, ACTION_KEY);
+            (index, found) = allKeys.find(addrToKey(msg.sender), ACTION_KEY);
         }
         require(found);
 

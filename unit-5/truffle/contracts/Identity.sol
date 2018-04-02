@@ -5,16 +5,12 @@ import "./ERC735.sol";
 import "./KeyGetters.sol";
 import "./KeyManager.sol";
 import "./MultiSig.sol";
+import "./ClaimManager.sol";
 
-contract Identity is Destructible, KeyManager, KeyGetters, MultiSig {
+contract Identity is Destructible, KeyManager, KeyGetters, MultiSig, ClaimManager {
     function Identity() public {
         // Add key that deployed the contract
-        _addKey(keccak256(msg.sender), MANAGEMENT_KEY, ECDSA);
-    }
-
-    // Helper function
-    function addressToKey(address addr) public pure returns (bytes32) {
-        return keccak256(addr);
+        _addKey(addrToKey(msg.sender), MANAGEMENT_KEY, ECDSA_TYPE);
     }
 
     // Fallback function accepts Ether transactions

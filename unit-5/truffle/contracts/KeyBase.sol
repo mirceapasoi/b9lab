@@ -20,12 +20,21 @@ contract KeyBase {
         // Only works with 1 key
         require(managementThreshold == 1);
         uint index;
-        (index, found) = allKeys.findAddr(msg.sender, MANAGEMENT_KEY);
+        (index, found) = allKeys.find(addrToKey(msg.sender), MANAGEMENT_KEY);
     }
 
     modifier onlyManagementOrSelf {
         // MUST only be done by keys of purpose 1, or the identity itself
         require(msg.sender == address(this) || _managementCall());
         _;
+    }
+
+    // Helper function
+    function addrToKey(address addr)
+        public
+        pure
+        returns (bytes32)
+    {
+        return keccak256(addr);
     }
 }
