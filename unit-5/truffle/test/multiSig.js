@@ -62,31 +62,31 @@ contract("MultiSig", async (accounts) => {
 
     describe("execute(_to != self)", async () => {
         it("other contract works", async () => {
-            assert.equal(await otherContract.getCalls({from: addr.action[1]}), 0);
+            assert.equal(await otherContract.numCalls(addr.action[1]), 0);
 
             await assertOkTx(otherContract.callMe({from: addr.action[1]}));
 
-            assert.equal(await otherContract.getCalls({from: addr.action[1]}), 1);
+            assert.equal(await otherContract.numCalls(addr.action[1]), 1);
         });
 
         it("should call other contracts with action keys", async () => {
             // Identity never called other contract
-            assert.equal(await otherContract.getCalls({from: contract.address}), 0);
+            assert.equal(await otherContract.numCalls(contract.address), 0);
 
             let callData = await otherContract.contract.callMe.getData();
             await assertOkTx(contract.execute(otherContract.address, 0, callData, {from: addr.action[1]}));
 
             // Identity called other contract
-            assert.equal(await otherContract.getCalls({from: contract.address}), 1);
+            assert.equal(await otherContract.numCalls(contract.address), 1);
         });
 
         it("should not call other contracts with management keys", async () => {
-            assert.equal(await otherContract.getCalls({from: contract.address}), 0);
+            assert.equal(await otherContract.numCalls(contract.address), 0);
 
             let callData = await otherContract.contract.callMe.getData();
             await assertRevert(contract.execute(otherContract.address, 0, callData, {from: addr.manager[1]}));
 
-            assert.equal(await otherContract.getCalls({from: contract.address}), 0);
+            assert.equal(await otherContract.numCalls(contract.address), 0);
         });
     });
 
@@ -149,7 +149,7 @@ contract("MultiSig", async (accounts) => {
             await assertOkTx(contract.changeActionThreshold(3, {from: addr.manager[1]}));
 
             // No calls yet
-            assert.equal(await otherContract.getCalls({from: contract.address}), 0);
+            assert.equal(await otherContract.numCalls(contract.address), 0);
 
             // One action requested
             let callData = await otherContract.contract.callMe.getData();
@@ -157,7 +157,7 @@ contract("MultiSig", async (accounts) => {
             let id = findExecutionId(r);
 
             // Still no calls
-            assert.equal(await otherContract.getCalls({from: contract.address}), 0);
+            assert.equal(await otherContract.numCalls(contract.address), 0);
 
             // Can't double approve
             await assertRevert(contract.approve(id, true, {from: addr.action[1]}));
@@ -169,13 +169,13 @@ contract("MultiSig", async (accounts) => {
             await assertOkTx(contract.approve(id, true, {from: addr.action[0]}));
             await assertOkTx(contract.approve(id, false, {from: addr.action[0]}));
             await assertOkTx(contract.approve(id, true, {from: addr.action[0]}));
-            assert.equal(await otherContract.getCalls({from: contract.address}), 0);
+            assert.equal(await otherContract.numCalls(contract.address), 0);
 
             // One more approval
             await assertOkTx(contract.approve(id, true, {from: addr.action[2]}));
 
             // Call has been made!
-            assert.equal(await otherContract.getCalls({from: contract.address}), 1);
+            assert.equal(await otherContract.numCalls(contract.address), 1);
 
             // ID no longer exists
             await assertRevert(contract.approve(id, false, {from: addr.action[1]}));
