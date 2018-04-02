@@ -14,6 +14,22 @@ export const KeyType = {
     ECDSA: 1,
 };
 
+export const ClaimType = {
+    BIOMETRIC: 1,
+    RESIDENCE: 2,
+    REGISTRY: 3,
+    PROFILE: 4,
+    LABEL: 5
+}
+
+export const Scheme = {
+    ECDSA: 1,
+    RSA: 2,
+    CONTRACT: 3,
+    URI: 4,
+    RAW: 5
+}
+
 export const assertKeyCount = async (contract, purpose, count) => {
     let keys = await contract.getKeysByPurpose(purpose);
     assert.equal(keys.length, count);
@@ -39,7 +55,7 @@ export const setupTest = async (accounts, init12, total12, init34, total34) => {
     let addressesToKeys = async (addresses) => {
         let keys = [];
         for (let addr of addresses) {
-            let key = await contract.addressToKey(addr);
+            let key = await contract.addrToKey(addr);
             keys.push(key);
         }
         return keys;
