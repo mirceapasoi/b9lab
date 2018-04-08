@@ -28,9 +28,11 @@ library KeyArray {
 
     function remove(Key[] storage self, uint index)
         internal
-        returns (Key key)
+        returns (uint256 keyType)
     {
-        key = self[index];
-        delete self[index];
+        keyType = self[index].keyType;
+        self[index] = self[self.length - 1];
+        delete self[self.length - 1];
+        self.length--;
     }
 }

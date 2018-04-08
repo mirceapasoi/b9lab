@@ -15,9 +15,8 @@ contract KeyManager is Pausable, ERC725 {
         whenNotPaused
         returns (bool success)
     {
-        uint index;
         bool found;
-        (index, found) = allKeys.find(_key, _purpose);
+        (, found) = allKeys.find(_key, _purpose);
         if (found) {
             return false;
         }
@@ -35,8 +34,8 @@ contract KeyManager is Pausable, ERC725 {
         bool found;
         (index, found) = allKeys.find(_key, _purpose);
         if (found) {
-            KeyArray.Key memory k = allKeys.remove(index);
-            emit KeyRemoved(k.key, k.purpose, k.keyType);
+            uint256 keyType = allKeys.remove(index);
+            emit KeyRemoved(_key, _purpose, keyType);
         }
         return found;
     }

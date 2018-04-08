@@ -53,7 +53,6 @@ contract MultiSig is Pausable, ERC725 {
         returns (uint256 executionId)
     {
         bool found;
-        uint index;
         uint threshold;
         if (_to == address(this)) {
             if (msg.sender == address(this)) {
@@ -62,7 +61,7 @@ contract MultiSig is Pausable, ERC725 {
                 threshold = managementThreshold;
             } else {
                 // Only management keys can operate on this contract
-                (index, found) = allKeys.find(addrToKey(msg.sender), MANAGEMENT_KEY);
+                (, found) = allKeys.find(addrToKey(msg.sender), MANAGEMENT_KEY);
                 threshold = managementThreshold - 1;
             }
         } else {
@@ -73,7 +72,7 @@ contract MultiSig is Pausable, ERC725 {
                 threshold = actionThreshold;
             } else {
                 // Action keys can operate on other addresses
-                (index, found) = allKeys.find(addrToKey(msg.sender), ACTION_KEY);
+                (, found) = allKeys.find(addrToKey(msg.sender), ACTION_KEY);
                 threshold = actionThreshold - 1;
             }
         }
@@ -131,11 +130,10 @@ contract MultiSig is Pausable, ERC725 {
 
         // Must be approved with the right key
         bool found;
-        uint index;
         if (e.to == address(this)) {
-            (index, found) = allKeys.find(addrToKey(msg.sender), MANAGEMENT_KEY);
+            (, found) = allKeys.find(addrToKey(msg.sender), MANAGEMENT_KEY);
         } else {
-            (index, found) = allKeys.find(addrToKey(msg.sender), ACTION_KEY);
+            (, found) = allKeys.find(addrToKey(msg.sender), ACTION_KEY);
         }
         require(found);
 
