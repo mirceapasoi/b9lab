@@ -9,6 +9,7 @@ contract KeyBase {
     uint256 public managementThreshold = 1;
     uint256 public actionThreshold = 1;
 
+    // Store keys in an array
     using KeyArray for KeyArray.Key[];
     KeyArray.Key[] allKeys;
 
@@ -17,10 +18,9 @@ contract KeyBase {
         view
         returns (bool found)
     {
-        // Only works with 1 key
+        // Only works with 1 key threshold
         require(managementThreshold == 1);
-        uint index;
-        (index, found) = allKeys.find(addrToKey(msg.sender), MANAGEMENT_KEY);
+        (, found) = allKeys.find(addrToKey(msg.sender), MANAGEMENT_KEY);
     }
 
     modifier onlyManagementOrSelf {
@@ -30,6 +30,14 @@ contract KeyBase {
     }
 
     // Helper function
+    function numKeys()
+        external
+        view
+        returns (uint)
+    {
+        return allKeys.length;
+    }
+
     function addrToKey(address addr)
         public
         pure

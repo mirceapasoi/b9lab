@@ -9,7 +9,7 @@ contract("KeyGetters", async (accounts) => {
     after("all done", printTotalGas);
 
     beforeEach("new contract", async () => {
-        ({ contract, addr, keys } = await setupTest(accounts, 2, 3, 0, 1));
+        ({ contract, addr, keys } = await setupTest(accounts, [2, 2, 0, 0], [3, 3, 1, 1]));
     })
 
     let assertGetKey = async (key, purpose, keyType) => {
@@ -46,7 +46,7 @@ contract("KeyGetters", async (accounts) => {
         });
 
         it("should return multiple keys by purpose", async () => {
-            await assertOkTx(contract.addKey(keys.action[0], Purpose.MANAGEMENT, KeyType.ECDSA));
+            await assertOkTx(contract.addKey(keys.action[0], Purpose.MANAGEMENT, KeyType.ECDSA, {from: addr.manager[0]}));
             let purposes = await contract.getKeyPurpose(keys.action[0]);
             assert.equal(purposes.length, 2);
             purposes[0].should.be.bignumber.equal(Purpose.ACTION);

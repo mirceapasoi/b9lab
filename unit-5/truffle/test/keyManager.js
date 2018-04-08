@@ -9,7 +9,7 @@ contract("KeyManager", async (accounts) => {
     after("all done", printTotalGas);
 
     beforeEach("new contract", async () => {
-        ({ contract, addr, keys } = await setupTest(accounts, 2, 3, 0, 1));
+        ({ contract, addr, keys } = await setupTest(accounts, [2, 2, 0, 0], [3, 3, 1, 1]));
     })
 
     describe("addKey", async () => {
@@ -22,6 +22,9 @@ contract("KeyManager", async (accounts) => {
 
             // End with 3
             await assertKeyCount(contract, Purpose.ACTION, 3);
+
+            let total = await contract.numKeys();
+            total.should.be.bignumber.equal(5);
         });
 
         it ("should add only for management keys", async () => {
@@ -33,6 +36,9 @@ contract("KeyManager", async (accounts) => {
 
             // End with 2
             await assertKeyCount(contract, Purpose.ACTION, 2);
+
+            let total = await contract.numKeys();
+            total.should.be.bignumber.equal(4);
         });
     });
 
@@ -48,6 +54,9 @@ contract("KeyManager", async (accounts) => {
             // Remove self
             await assertOkTx(contract.removeKey(keys.manager[0], Purpose.MANAGEMENT, {from: addr.manager[0]}));
             await assertKeyCount(contract, Purpose.MANAGEMENT, 0);
+
+            let total = await contract.numKeys();
+            total.should.be.bignumber.equal(2);
         });
 
         it("should remove only for management keys", async () => {
@@ -59,6 +68,9 @@ contract("KeyManager", async (accounts) => {
 
             // End with 2
             await assertKeyCount(contract, Purpose.MANAGEMENT, 2);
+
+            let total = await contract.numKeys();
+            total.should.be.bignumber.equal(4);
         });
 
         it ("should ignore keys that don't exist", async () => {
@@ -67,6 +79,9 @@ contract("KeyManager", async (accounts) => {
 
             await assertOkTx(contract.removeKey(keys.claim[0], Purpose.CLAIM, {from: addr.manager[0]}));
             await assertOkTx(contract.removeKey(keys.encrypt[0], Purpose.ENCRYPT, {from: addr.manager[0]}));
+
+            let total = await contract.numKeys();
+            total.should.be.bignumber.equal(4);
         });
     });
 });

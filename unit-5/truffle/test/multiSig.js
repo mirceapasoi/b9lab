@@ -12,7 +12,7 @@ contract("MultiSig", async (accounts) => {
     after("all done", printTotalGas);
 
     beforeEach("new contract", async () => {
-        ({ contract, addr, keys } = await setupTest(accounts, 3, 4, 0, 1));
+        ({ contract, addr, keys } = await setupTest(accounts, [3, 3, 0, 0], [4, 4, 1, 1]));
         otherContract = await IdentityTest.deployed();
     })
 

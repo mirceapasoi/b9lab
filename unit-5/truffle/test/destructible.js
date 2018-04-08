@@ -9,7 +9,7 @@ contract("Destructible", async (accounts) => {
     after("all done", printTotalGas);
 
     beforeEach("new contract", async () => {
-        ({ contract, addr, keys } = await setupTest(accounts, 2, 3, 0, 0));
+        ({ contract, addr, keys } = await setupTest(accounts, [2, 2, 0, 0], [3, 3, 0, 0]));
     })
 
     it("should be killed by management keys", async () => {

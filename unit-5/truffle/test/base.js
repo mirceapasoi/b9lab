@@ -25,9 +25,7 @@ export const ClaimType = {
 export const Scheme = {
     ECDSA: 1,
     RSA: 2,
-    CONTRACT: 3,
-    URI: 4,
-    RAW: 5
+    CONTRACT: 3
 }
 
 export const assertKeyCount = async (contract, purpose, count) => {
@@ -36,50 +34,52 @@ export const assertKeyCount = async (contract, purpose, count) => {
 };
 
 // Setup test environment
-export const setupTest = async (accounts, init12, total12, init34, total34) => {
-    assert(2 * total12 + 2 * total34 <= accounts.length);
+export const setupTest = async (accounts, init, total) => {
+    let totalSum = total.reduce((a, b) => a + b);
+    let initSum = init.reduce((a, b) => a + b);
+    // Check we have enough accounts
+    assert(initSum <= totalSum && totalSum <= accounts.length);
+    // Generate keys using keccak256 / sha3
+    accounts = accounts.map(a => [a, web3.sha3(a, {encoding: 'hex'})]);
+    // Sort by keys (useful for contract constructor)
+    accounts.sort((a, b) => a[1].localeCompare(b[1]));
 
-    // Generate addresses
-    let addr = {
-        manager: accounts.slice(0, total12),
-        action: accounts.slice(total12, total12 * 2),
-        claim: accounts.slice(total12 * 2, total12 * 2 + total34),
-        encrypt:  accounts.slice(total12 * 2 + total34, total12 * 2 + total34 * 2)
-    };
+    // Put keys in maps
+    const idxToPurpose = ['manager', 'action', 'claim', 'encrypt'];
+    let addr = {}, keys = {};
+    for (let i = 0, j = 0; i < total.length; i++) {
+        // Slice total[i] accounts
+        let slice = accounts.slice(j, j + total[i]);
+        j += total[i];
+        let purpose = idxToPurpose[i];
+        addr[purpose] = slice.map(a => a[0]);
+        keys[purpose] = slice.map(a => a[1]);
+    }
+
+    // Init keys
+    let initKeys = [], initPurposes = [];
+    for (let i = 0; i < init.length; i++) {
+        let purpose = idxToPurpose[i];
+        let k = keys[purpose].slice(0, init[i]);
+        let p = Array(init[i]).fill(i + 1); // Use numeric value for purpose
+        initKeys = initKeys.concat(k);
+        initPurposes = initPurposes.concat(p);
+    }
 
     // Deploy contract
-    let contract = await Identity.new({from: addr.manager[0]});
+    let contract = await Identity.new(
+        initKeys,
+        initPurposes,
+        Array(initSum).fill(KeyType.ECDSA),
+        {from: addr.manager[0]}
+    );
     await measureTx(contract.transactionHash);
 
-    // Generate keys
-    let addressesToKeys = async (addresses) => {
-        let keys = [];
-        for (let addr of addresses) {
-            let key = await contract.addrToKey(addr);
-            keys.push(key);
-        }
-        return keys;
-    };
-    let keys = {
-        manager: await addressesToKeys(addr.manager),
-        action: await addressesToKeys(addr.action),
-        claim: await addressesToKeys(addr.claim),
-        encrypt: await addressesToKeys(addr.encrypt)
-    };
+    // Check init
+    let contractKeys = await contract.numKeys();
+    contractKeys.should.be.bignumber.equal(initSum);
 
-    // Add some keys
-    for (let i = 1; i < init12; i++) {
-        await assertOkTx(contract.addKey(keys.manager[i], Purpose.MANAGEMENT, KeyType.ECDSA, {from: addr.manager[0]}));
-    }
-    for (let i = 0; i < init12; i++) {
-        await assertOkTx(contract.addKey(keys.action[i], Purpose.ACTION, KeyType.ECDSA, {from: addr.manager[0]}));
-    }
-    for (let i = 0; i < init34; i++) {
-        await assertOkTx(contract.addKey(keys.claim[i], Purpose.CLAIM, KeyType.ECDSA, {from: addr.manager[0]}));
-        await assertOkTx(contract.addKey(keys.encrypt[i], Purpose.ENCRYPT, KeyType.ECDSA, {from: addr.manager[0]}));
-    }
-
-    console.debug(`Setup: ${getAndClearGas().toLocaleString()} gas (${init12 + init34}/${total12 + total34} keys added)`.grey);
+    console.debug(`Setup: ${getAndClearGas().toLocaleString()} gas (${initSum}/${totalSum} keys added)`.grey);
 
     return {
         contract,
