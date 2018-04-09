@@ -84,4 +84,6 @@ contract("KeyManager", async (accounts) => {
             total.should.be.bignumber.equal(4);
         });
     });
+
+    // TODO: test KeyAdded, KeyRemoved
 });

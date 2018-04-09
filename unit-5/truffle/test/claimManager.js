@@ -323,4 +323,6 @@ contract("ClaimManager", async (accounts) => {
 
         });
     });
+
+    // TODO: test ClaimRequested, ClaimAdded, ClaimRemoved, ClaimChanged
 });

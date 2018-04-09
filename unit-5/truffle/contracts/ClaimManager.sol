@@ -106,7 +106,7 @@ contract ClaimManager is Pausable, ERC725, ERC735 {
             return;
         }
 
-        bytes32 claimId = keccak256(issuer, _claimType);
+        bytes32 claimId = getClaimId(issuer, _claimType);
         if (claims[claimId].issuer == address(0)) {
             // New claim
             claims[claimId] = Claim(_claimType, _scheme, issuer, _signature, _data, _uri);
@@ -234,6 +234,8 @@ contract ClaimManager is Pausable, ERC725, ERC735 {
         pure
         returns (bytes32)
     {
+        // TODO: Doesn't allow multiple claims from the same issuer with the same type
+        // This is particularly inconvenient for self-claims (e.g. self-claim multiple labels)
         return keccak256(issuer, claimType);
     }
 
@@ -242,6 +244,7 @@ contract ClaimManager is Pausable, ERC725, ERC735 {
         pure
         returns (bytes32)
     {
+        // TODO: Why is "uri" not included in signature?
         return keccak256(subject, claimType, data);
     }
 

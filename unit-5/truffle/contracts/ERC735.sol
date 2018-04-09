@@ -32,11 +32,11 @@ contract ERC735 is ERC165 {
     event ClaimAdded(bytes32 indexed claimId, uint256 indexed claimType, uint256 scheme, address indexed issuer, bytes signature, bytes data, string uri);
     event ClaimRemoved(bytes32 indexed claimId, uint256 indexed claimType, uint256 scheme, address indexed issuer, bytes signature, bytes data, string uri);
     event ClaimChanged(bytes32 indexed claimId, uint256 indexed claimType, uint256 scheme, address indexed issuer, bytes signature, bytes data, string uri);
-    // Not part of the standard
-    event ClaimRemoveRequested(uint256 indexed claimRequestId, uint256 indexed claimType, uint256 scheme, address indexed issuer, bytes signature, bytes data, string uri);
 
     function getClaim(bytes32 _claimId) public view returns(uint256 claimType, uint256 scheme, address issuer, bytes signature, bytes data, string uri);
     function getClaimIdsByType(uint256 _claimType) public view returns(bytes32[] claimIds);
     function addClaim(uint256 _claimType, uint256 _scheme, address issuer, bytes _signature, bytes _data, string _uri) public returns (uint256 claimRequestId);
     function removeClaim(bytes32 _claimId) public returns (bool success);
+    // TODO: Not part of the standard
+    function getClaimByTypeAndIndex(uint256 _claimType, uint256 _index) public view returns(uint256 claimType, uint256 scheme, address issuer, bytes32 signature, bytes32 data, bytes32 uri);
 }
