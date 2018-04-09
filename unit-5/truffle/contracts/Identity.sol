@@ -9,38 +9,58 @@ import "./ClaimManager.sol";
 
 contract Identity is Destructible, KeyManager, KeyGetters, MultiSig, ClaimManager {
     function Identity(
-        bytes32[] keys,
-        uint256[] purposes,
-        uint256[] keyTypes
+        bytes32[] _keys,
+        uint256[] _purposes,
+        uint256[] _keyTypes,
+        uint256 _managementThreshold,
+        uint256 _actionThreshold
+        // TODO: Pass bytes[] signatures, bytes[] data and string[] uris once ABIEncoderV2 is out
     )
         public
     {
+        require(_managementThreshold > 0);
+        require(_actionThreshold > 0);
         // Validate keys are sorted and unique
-        require(keys.length == purposes.length);
-        require(purposes.length == keyTypes.length);
-        for (uint i = 1; i < keys.length; i++) {
+        require(_keys.length == _purposes.length);
+        require(_purposes.length == _keyTypes.length);
+        for (uint i = 1; i < _keys.length; i++) {
             // Expect input to be in sorted order, first by keys, then by purposes
             // Sorted order guarantees (key, purpose) pairs are unique and we can use
             // _addKey insteaad of addKey (which also checks for existance)
-            bytes32 prevKey = keys[i - 1];
-            require(keys[i] > prevKey || (keys[i] == prevKey && purposes[i] > purposes[i - 1]));
+            bytes32 prevKey = _keys[i - 1];
+            require(_keys[i] > prevKey || (_keys[i] == prevKey && _purposes[i] > _purposes[i - 1]));
         }
 
         // Supports both ERC 725 & 735
         supportedInterfaces[ERC725ID() ^ ERC735ID()] = true;
 
-        if (keys.length == 0) {
+        uint256 actionCount;
+        uint256 managementCount;
+        if (_keys.length == 0) {
             bytes32 senderKey = addrToKey(msg.sender);
             // Add key that deployed the contract for MANAGEMENT, ACTION, CLAIM
             _addKey(senderKey, MANAGEMENT_KEY, ECDSA_TYPE);
             _addKey(senderKey, ACTION_KEY, ECDSA_TYPE);
             _addKey(senderKey, CLAIM_SIGNER_KEY, ECDSA_TYPE);
+            actionCount = 1;
+            managementCount = 1;
         } else {
             // Add constructor keys
-            for (i = 0; i < keys.length; i++) {
-                _addKey(keys[i], purposes[i], keyTypes[i]);
+            for (i = 0; i < _keys.length; i++) {
+                _addKey(_keys[i], _purposes[i], _keyTypes[i]);
+                if (_purposes[i] == MANAGEMENT_KEY) {
+                    managementCount++;
+                } else
+                if (_purposes[i] == ACTION_KEY) {
+                    actionCount++;
+                }
             }
         }
+
+        require(_managementThreshold <= managementCount);
+        require(_actionThreshold <= actionCount);
+        managementThreshold = _managementThreshold;
+        actionThreshold = _actionThreshold;
     }
 
     // Fallback function accepts Ether transactions

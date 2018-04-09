@@ -34,7 +34,7 @@ export const assertKeyCount = async (identity, purpose, count) => {
 };
 
 // Setup test environment
-export const setupTest = async (accounts, init, total, claims = []) => {
+export const setupTest = async (accounts, init, total, claims = [], managementThreshold = 1, actionThreshold = 1) => {
     let totalSum = total.reduce((a, b) => a + b);
     let initSum = init.reduce((a, b) => a + b);
     let addr = {}, keys = {};
@@ -45,10 +45,14 @@ export const setupTest = async (accounts, init, total, claims = []) => {
     // Use deployed identity for other identity
     let otherIdentity = await Identity.deployed();
     addr.other = accounts[0];
-    keys.other = web3.sha3(accounts[0], {encoding: 'hex'});
+    keys.other = await otherIdentity.addrToKey(accounts[0]);
 
     // Slice accounts (0 is used above) and generate keys using keccak256
-    let accountTuples = accounts.slice(1).map(a => [a, web3.sha3(a, {encoding: 'hex'})]);
+    let accountTuples = [];
+    for (let addr of accounts.slice(1)) {
+        let key = await otherIdentity.addrToKey(addr);
+        accountTuples.push([addr, key]);
+    }
     // Sort by keys (useful for identity constructor)
     accountTuples.sort((a, b) => a[1].localeCompare(b[1]));
     // Put keys in maps
@@ -93,6 +97,8 @@ export const setupTest = async (accounts, init, total, claims = []) => {
         initKeys,
         initPurposes,
         Array(initSum).fill(KeyType.ECDSA),
+        managementThreshold,
+        actionThreshold,
         {from: addr.manager[0]}
     );
     // Make sure it matches address used for signatures
