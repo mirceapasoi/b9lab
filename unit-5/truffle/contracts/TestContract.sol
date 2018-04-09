@@ -1,9 +1,9 @@
 pragma solidity ^0.4.21;
 
-contract IdentityTest {
+contract TestContract {
     mapping (address => uint) public numCalls;
 
-    function IdentityTest() public {
+    function TestContract() public {
     }
 
     function callMe() external {
