@@ -34,7 +34,7 @@ contract("ClaimManager", async (accounts) => {
     }
 
     const findClaimRequestId = (r) => {
-        return r.logs.find(e => ['ClaimRequested', 'ClaimRemoveRequested'].includes(e.event)).args.claimRequestId;
+        return r.logs.find(e => e.event == 'ClaimRequested').args.claimRequestId;
     }
 
     beforeEach("new contract", async () => {
@@ -71,7 +71,7 @@ contract("ClaimManager", async (accounts) => {
             // Sign using eth_sign
             let signature = web3.eth.sign(addr.manager[0], toSign);
             // Recover address from signature
-            let signedBy = await identity.getSignatureAddress(identity.address, ClaimType.LABEL, label, signature);
+            let signedBy = await identity.getSignatureAddress(toSign, signature);
             assert.equal(signedBy, addr.manager[0]);
         });
 

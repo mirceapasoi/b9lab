@@ -36,7 +36,7 @@ contract ClaimManager is Pausable, ERC725, ERC735 {
         returns (bool)
     {
         if (_scheme == ECDSA_SCHEME) {
-            address signedBy = getSignatureAddress(address(this), _claimType, _data, _signature);
+            address signedBy = getSignatureAddress(claimToSign(address(this), _claimType, _data), _signature);
             if (issuer == signedBy) {
                 // Issuer signed the signature
                 return true;
@@ -58,31 +58,28 @@ contract ClaimManager is Pausable, ERC725, ERC735 {
         }
     }
 
-    function _validClaimAction(address issuer)
-        internal
-        view
-        returns (bool)
-    {
-        if (msg.sender == address(this) || _managementCall()) {
-            // MUST only be done by the issuer of the claim, or keys of purpose 1, or the identity itself.
-            return true;
-        }
-        if (issuer == address(0)) {
-            // Can't perform action
-            return false;
-        }
+    modifier onlyManagementOrSelfOrIssuer(bytes32 _claimId) {
+        address issuer = claims[_claimId].issuer;
+        // Must exist
+        require(issuer != 0);
+
+        bool valid = false;
+        if (_managementOrSelf()) {
+            valid = true;
+        } else
         if (msg.sender == issuer) {
             // MUST only be done by the issuer of the claim
-            return true;
+            valid = true;
         } else
         if (issuer.doesContractImplementInterface(ERC725ID())) {
             // Issuer is another Identity contract, is this an action key?
             uint256 purpose;
             (purpose, , ) = ERC725(issuer).getKey(addrToKey(msg.sender), ACTION_KEY);
-            return (purpose == ACTION_KEY);
+            valid = (purpose == ACTION_KEY);
         }
-        // Can't perform action on a claim issued by issuer
-        return false;
+        // Can perform action on claim
+        require(valid);
+        _;
     }
 
     function addClaim(
@@ -100,10 +97,7 @@ contract ClaimManager is Pausable, ERC725, ERC735 {
         // Check signature
         require(_validSignature(_claimType, _scheme, issuer, _signature, _data));
         // Check we can perform action
-        // If we pass "issuer" for an existing claim, then updates won't require any approval
-        // from the identity. Just because a claim exists, it doesn't mean all future updates
-        // are automatically approved. Hence, we pass address(0)
-        bool noApproval = _validClaimAction(0);
+        bool noApproval = _managementOrSelf();
 
         if (!noApproval) {
             // SHOULD be approved or rejected by n of m approve calls from keys of purpose 1
@@ -134,15 +128,11 @@ contract ClaimManager is Pausable, ERC725, ERC735 {
 
     function removeClaim(bytes32 _claimId)
         public
+        whenNotPaused
+        onlyManagementOrSelfOrIssuer(_claimId)
         returns (bool success)
     {
-        // Must exist
         Claim memory c = claims[_claimId];
-        require(c.issuer != 0);
-
-        // Can sender act on this claim?
-        require(_validClaimAction(c.issuer));
-
         // Remove from mapping
         delete claims[_claimId];
         // Remove from type array
@@ -192,18 +182,42 @@ contract ClaimManager is Pausable, ERC725, ERC735 {
         claimIds = claimsByType[_claimType];
     }
 
+    function getClaimByTypeAndIndex(uint256 _claimType, uint256 _index)
+        public
+        view
+        returns (
+        uint256 claimType,
+        uint256 scheme,
+        address issuer,
+        bytes32 signature,
+        bytes32 data,
+        bytes32 uri
+        )
+    {
+        // TODO: Get rid of this when Solidity 0.4.22 is out
+        // https://github.com/ethereum/solidity/issues/3270
+        bytes32 claimId = claimsByType[_claimType][_index];
+        bytes memory _signature;
+        bytes memory _data;
+        string memory _uri;
+        (claimType, scheme, issuer, _signature, _data, _uri) = getClaim(claimId);
+        // https://ethereum.stackexchange.com/questions/9142/how-to-convert-a-string-to-bytes32
+        assembly {
+            signature := mload(add(_signature, 32))
+            data := mload(add(_data, 32))
+            uri := mload(add(_uri, 32))
+        }
+    }
+
     // Helper functions
     function refreshClaim(bytes32 _claimId)
         public
+        whenNotPaused
+        onlyManagementOrSelfOrIssuer(_claimId)
         returns (bool)
     {
         // Must exist
         Claim memory c = claims[_claimId];
-        require(c.issuer != 0);
-
-        // Check we can perform action
-        require(_validClaimAction(c.issuer));
-
         // Check claim is still valid
         if (!_validSignature(c.claimType, c.scheme, c.issuer, c.signature, c.data)) {
             // Remove claim
@@ -231,13 +245,11 @@ contract ClaimManager is Pausable, ERC725, ERC735 {
         return keccak256(subject, claimType, data);
     }
 
-    function getSignatureAddress(address subject, uint256 claimType, bytes data, bytes signature)
+    function getSignatureAddress(bytes32 signed, bytes signature)
         public
         pure
         returns (address)
     {
-        bytes32 toSign = claimToSign(subject, claimType, data);
-        bytes32 prefixed = keccak256(ETH_PREFIX, toSign);
-        return prefixed.recover(signature);
+        return keccak256(ETH_PREFIX, signed).recover(signature);
     }
 }
