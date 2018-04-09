@@ -1,6 +1,6 @@
 const Identity = artifacts.require("Identity");
 import colors from 'colors';
-import { assertOkTx, getAndClearGas, measureTx } from './util';
+import { assertOkTx, getAndClearGas, measureTx, contractAddress } from './util';
 
 // Constants
 export const Purpose = {
@@ -28,35 +28,41 @@ export const Scheme = {
     CONTRACT: 3
 }
 
-export const assertKeyCount = async (contract, purpose, count) => {
-    let keys = await contract.getKeysByPurpose(purpose);
+export const assertKeyCount = async (identity, purpose, count) => {
+    let keys = await identity.getKeysByPurpose(purpose);
     assert.equal(keys.length, count);
 };
 
 // Setup test environment
-export const setupTest = async (accounts, init, total) => {
+export const setupTest = async (accounts, init, total, claims = []) => {
     let totalSum = total.reduce((a, b) => a + b);
     let initSum = init.reduce((a, b) => a + b);
-    // Check we have enough accounts
-    assert(initSum <= totalSum && totalSum <= accounts.length);
-    // Generate keys using keccak256 / sha3
-    accounts = accounts.map(a => [a, web3.sha3(a, {encoding: 'hex'})]);
-    // Sort by keys (useful for contract constructor)
-    accounts.sort((a, b) => a[1].localeCompare(b[1]));
+    let addr = {}, keys = {};
 
+    // Check we have enough accounts
+    assert(initSum <= totalSum && totalSum + 1 <= accounts.length, "Not enough accounts");
+
+    // Use deployed identity for other identity
+    let otherIdentity = await Identity.deployed();
+    addr.other = accounts[0];
+    keys.other = web3.sha3(accounts[0], {encoding: 'hex'});
+
+    // Slice accounts (0 is used above) and generate keys using keccak256
+    let accountTuples = accounts.slice(1).map(a => [a, web3.sha3(a, {encoding: 'hex'})]);
+    // Sort by keys (useful for identity constructor)
+    accountTuples.sort((a, b) => a[1].localeCompare(b[1]));
     // Put keys in maps
     const idxToPurpose = ['manager', 'action', 'claim', 'encrypt'];
-    let addr = {}, keys = {};
     for (let i = 0, j = 0; i < total.length; i++) {
         // Slice total[i] accounts
-        let slice = accounts.slice(j, j + total[i]);
+        let slice = accountTuples.slice(j, j + total[i]);
         j += total[i];
         let purpose = idxToPurpose[i];
         addr[purpose] = slice.map(a => a[0]);
         keys[purpose] = slice.map(a => a[1]);
     }
 
-    // Init keys
+    // Init keys to be sent in constructor
     let initKeys = [], initPurposes = [];
     for (let i = 0; i < init.length; i++) {
         let purpose = idxToPurpose[i];
@@ -66,24 +72,54 @@ export const setupTest = async (accounts, init, total) => {
         initPurposes = initPurposes.concat(p);
     }
 
-    // Deploy contract
-    let contract = await Identity.new(
+    // Init self-claims to be sent in constructor
+    let willDeployAt = contractAddress(addr.manager[0]);
+    let signatures = [];
+    if (claims.length > 0) {
+        // Must have at least one claim address if making claim
+        assert(addr.claim.length > 0);
+        for (const { type, data, self } of claims) {
+            // Claim hash
+            let toSign = await otherIdentity.claimToSign(willDeployAt, type, data);
+            // Sign using CLAIM_SIGNER_KEY
+            let claimSigner = self ? addr.claim[0] : addr.other;
+            let signature = web3.eth.sign(claimSigner, toSign);
+            signatures.push(signature);
+        }
+    }
+
+    // Deploy identity
+    let identity = await Identity.new(
         initKeys,
         initPurposes,
         Array(initSum).fill(KeyType.ECDSA),
         {from: addr.manager[0]}
     );
-    await measureTx(contract.transactionHash);
+    // Make sure it matches address used for signatures
+    assert.equal(identity.address, willDeployAt);
+    // Measure gas usage
+    await measureTx(identity.transactionHash);
 
-    // Check init
-    let contractKeys = await contract.numKeys();
+    // Add self-laims one by one, until ABIEncoderV2 works and we can send them through the constructor
+    for (let i = 0; i < claims.length; i++) {
+        const { type, data, uri, self } = claims[i];
+        let issuer = self ? identity.address : otherIdentity.address;
+        await assertOkTx(identity.addClaim(type, Scheme.ECDSA, issuer, signatures[i], data, uri, {from: addr.manager[0]}));
+    }
+
+    // Check init keys
+    let contractKeys = await identity.numKeys();
     contractKeys.should.be.bignumber.equal(initSum);
+    // Check init claims
+    let contractClaims = await identity.numClaims();
+    contractClaims.should.be.bignumber.equal(claims.length);
 
-    console.debug(`Setup: ${getAndClearGas().toLocaleString()} gas (${initSum}/${totalSum} keys added)`.grey);
+    console.debug(`Setup: ${getAndClearGas().toLocaleString()} gas (${initSum}/${totalSum} keys, ${contractClaims} claims)`.grey);
 
     return {
-        contract,
+        identity,
         addr,
-        keys
+        keys,
+        otherIdentity
     }
 }
