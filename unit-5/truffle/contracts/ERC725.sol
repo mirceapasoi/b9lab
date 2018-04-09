@@ -26,6 +26,7 @@ contract ERC725 is ERC165 {
 
     // KeyType
     uint256 constant ECDSA_TYPE = 1;
+    // https://medium.com/@alexberegszaszi/lets-bring-the-70s-to-ethereum-48daa16a4b51
     uint256 constant RSA_TYPE = 2;
 
     event KeyAdded(bytes32 indexed key, uint256 indexed purpose, uint256 indexed keyType);
@@ -33,7 +34,7 @@ contract ERC725 is ERC165 {
     event ExecutionRequested(uint256 indexed executionId, address indexed to, uint256 indexed value, bytes data);
     event Executed(uint256 indexed executionId, address indexed to, uint256 indexed value, bytes data);
     event Approved(uint256 indexed executionId, bool approved);
-    // Extra event, not part of the standard
+    // TODO: Extra event, not part of the standard
     event ExecutionFailed(uint256 indexed executionId, address indexed to, uint256 indexed value, bytes data);
 
     function getKey(bytes32 _key, uint256 _purpose) public view returns(uint256 purpose, uint256 keyType, bytes32 key);

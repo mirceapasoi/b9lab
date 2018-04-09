@@ -145,7 +145,9 @@ contract MultiSig is Pausable, ERC725 {
             for (uint i = 0; i < approvals.length; i++) {
                 if (approvals[i] == msg.sender) {
                     // Undo approval
-                    delete approvals[i];
+                    approvals[i] = approvals[approvals.length - 1];
+                    delete approvals[approvals.length - 1];
+                    approvals.length--;
                     e.needsApprove += 1;
                     return true;
                 }

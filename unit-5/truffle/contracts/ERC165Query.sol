@@ -9,23 +9,23 @@ library ERC165Query {
         uint256 result;
 
         (success, result) = noThrowCall(_contract, ERC165ID);
-        if ((success==0)||(result==0)) {
+        if ((success == 0) || (result == 0)) {
             return false;
         }
 
         (success, result) = noThrowCall(_contract, InvalidID);
-        if ((success==0)||(result!=0)) {
+        if ((success == 0) || (result != 0)) {
             return false;
         }
 
         (success, result) = noThrowCall(_contract, _interfaceId);
-        if ((success==1)&&(result==1)) {
+        if ((success == 1) && (result == 1)) {
             return true;
         }
         return false;
     }
 
-    function noThrowCall(address _contract, bytes4 _interfaceId) constant internal returns (uint256 success, uint256 result) {
+    function noThrowCall(address _contract, bytes4 _interfaceId) internal view returns (uint256 success, uint256 result) {
         bytes4 erc165ID = ERC165ID;
 
         assembly {

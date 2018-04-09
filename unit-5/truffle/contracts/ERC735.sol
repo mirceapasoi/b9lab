@@ -23,18 +23,17 @@ contract ERC735 is ERC165 {
 
     // Scheme
     uint256 constant ECDSA_SCHEME = 1;
+    // https://medium.com/@alexberegszaszi/lets-bring-the-70s-to-ethereum-48daa16a4b51
     uint256 constant RSA_SCHEME = 2;
     // 3 is contract verification, where the data will be call data, and the issuer a contract address to call
     uint256 constant CONTRACT_SCHEME = 3;
-    // URI must equal data
-    uint256 constant URI_SCHEME = 4;
-    // Raw data
-    uint256 constant RAW_SCHEME = 5;
 
     event ClaimRequested(uint256 indexed claimRequestId, uint256 indexed claimType, uint256 scheme, address indexed issuer, bytes signature, bytes data, string uri);
     event ClaimAdded(bytes32 indexed claimId, uint256 indexed claimType, uint256 scheme, address indexed issuer, bytes signature, bytes data, string uri);
     event ClaimRemoved(bytes32 indexed claimId, uint256 indexed claimType, uint256 scheme, address indexed issuer, bytes signature, bytes data, string uri);
     event ClaimChanged(bytes32 indexed claimId, uint256 indexed claimType, uint256 scheme, address indexed issuer, bytes signature, bytes data, string uri);
+    // Not part of the standard
+    event ClaimRemoveRequested(uint256 indexed claimRequestId, uint256 indexed claimType, uint256 scheme, address indexed issuer, bytes signature, bytes data, string uri);
 
     function getClaim(bytes32 _claimId) public view returns(uint256 claimType, uint256 scheme, address issuer, bytes signature, bytes data, string uri);
     function getClaimIdsByType(uint256 _claimType) public view returns(bytes32[] claimIds);
