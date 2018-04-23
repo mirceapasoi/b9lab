@@ -22,14 +22,14 @@ contract("Remittance", (accounts) => {
 
     afterEach("print gas", () => {
         let gasUsed = getAndClearGas();
-        console.log(`Test: ${getAndClearGas().toLocaleString()} gas used`);
+        console.log(`\tTest: ${getAndClearGas().toLocaleString()} gas used`);
     });
 
     beforeEach("new contract", async () => {
         contract = await Remittance.new({from: owner});
         await measureTx(contract.transactionHash);
         startTime = latestTime();
-        console.log(`Setup: ${getAndClearGas().toLocaleString()} gas used`);
+        console.log(`\tSetup: ${getAndClearGas().toLocaleString()} gas used`);
     });
 
     it("A deposits for B, B unlocks", async () => {

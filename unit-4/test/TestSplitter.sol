@@ -1,4 +1,4 @@
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.23;
 
 import "truffle/Assert.sol";
 import "truffle/DeployedAddresses.sol";
@@ -14,7 +14,7 @@ contract TestSplitter {
 
         splitter.split.value(100 finney)(bobby, carol);
 
-        Assert.equal(splitter.balance, 100 finney, "Splitter contract should have the Ether");
+        Assert.equal(address(splitter).balance, 100 finney, "Splitter contract should have the Ether");
         Assert.equal(splitter.payments(bobby), 50 finney, "Bob should be owed the exact half");
         Assert.equal(splitter.payments(carol), 50 finney, "Carol should be owed the exact half");
     }

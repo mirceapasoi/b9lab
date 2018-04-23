@@ -1,4 +1,4 @@
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.23;
 
 import 'zeppelin-solidity/contracts/lifecycle/Pausable.sol';
 import 'zeppelin-solidity/contracts/lifecycle/Destructible.sol';
@@ -19,7 +19,7 @@ contract Remittance is Pausable, Destructible, PullPayment {
     mapping (bytes32 => Deposit) public deposits;
 
 
-    function Remittance() public {}
+    constructor() public {}
 
     // Called by sender off-chain to hide their secrets
     function encode(address to, bytes32 secret1, bytes32 secret2) public pure returns (bytes32) {
@@ -42,7 +42,7 @@ contract Remittance is Pausable, Destructible, PullPayment {
         d.from = msg.sender;
         d.value = msg.value;
         d.until = until;
-        LogDeposit(id, msg.sender, to, msg.value, until);
+        emit LogDeposit(id, msg.sender, to, msg.value, until);
     }
 
     function _cleanDeposit(Deposit storage d) private {
@@ -60,7 +60,7 @@ contract Remittance is Pausable, Destructible, PullPayment {
         require(d.from == msg.sender);
         // Pay owner back
         asyncSend(msg.sender, d.value);
-        LogWithdraw(id, msg.sender, msg.sender, d.value);
+        emit LogWithdraw(id, msg.sender, msg.sender, d.value);
         // Delete deposit
         _cleanDeposit(d);
     }
@@ -73,7 +73,7 @@ contract Remittance is Pausable, Destructible, PullPayment {
         require(d.value != 0);
         // Pay sender back
         asyncSend(msg.sender, d.value);
-        LogWithdraw(id, d.from, msg.sender, d.value);
+        emit LogWithdraw(id, d.from, msg.sender, d.value);
         // Delete deposit
         _cleanDeposit(d);
     }

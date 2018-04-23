@@ -1,4 +1,4 @@
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.23;
 
 import 'zeppelin-solidity/contracts/lifecycle/Pausable.sol';
 import 'zeppelin-solidity/contracts/lifecycle/Destructible.sol';
@@ -26,7 +26,7 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
     }
     mapping (bytes32 => Game) public games;
 
-    function RockPaperScissors() public {}
+    constructor() public {}
 
     // Called by player off-chain to hide their move
     function hashMove(address player1, address player2, Move move, bytes32 secret) public pure returns (bytes32) {
@@ -42,8 +42,12 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
     }
 
     function getGameStatus(address with) private view whenNotPaused returns (Game storage game, Status status) {
-        var (k1, k2) = getGameKeys(with);
-        var (t1, t2) = (games[k1].updatedAt, games[k2].updatedAt);
+        bytes32 k1;
+        bytes32 k2;
+        (k1, k2) = getGameKeys(with);
+        uint32 t1;
+        uint32 t2;
+        (t1, t2) = (games[k1].updatedAt, games[k2].updatedAt);
         // Both games can't exist at the same time
         assert(t1 == 0 || t2 == 0);
         if (t1 == 0 && t2 == 0) {
@@ -78,7 +82,9 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
     }
 
     function _cleanGame(address with) private {
-        var (k1, k2) = getGameKeys(with);
+        bytes32 k1;
+        bytes32 k2;
+        (k1, k2) = getGameKeys(with);
         delete games[k1];
         delete games[k2];
     }
@@ -86,17 +92,19 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
     function _cancelGame(address with, uint v1, uint v2) private {
         if (v1 != 0) {
             asyncSend(msg.sender, v1);
-            LogPayment(msg.sender, with, v1, Outcome.CANCEL);
+            emit LogPayment(msg.sender, with, v1, Outcome.CANCEL);
         }
         if (v2 != 0) {
             asyncSend(with, v2);
-            LogPayment(with, msg.sender, v2, Outcome.CANCEL);
+            emit LogPayment(with, msg.sender, v2, Outcome.CANCEL);
         }
         _cleanGame(with);
     }
 
     function cancel(address with) external whenNotPaused {
-        var (game, status) = getGameStatus(with);
+        Game storage game;
+        Status status;
+        (game, status) = getGameStatus(with);
         require(status != Status.NO_GAME);
         if (status == Status.GAME_P1_WAITING) {
             // You're player 1, you've waited enough for player 2
@@ -123,13 +131,15 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         // non-zero play
         require(msg.value > 0);
         // Check game
-        var (game, status) = getGameStatus(with);
+        Game storage game;
+        Status status;
+        (game, status) = getGameStatus(with);
         require(status == Status.NO_GAME);
         // Sender plays in secret
         game.updatedAt = uint32(block.timestamp);
         game.value1 = msg.value;
         game.secretMove = secretMove;
-        LogFirstMove(msg.sender, with, msg.value, secretMove);
+        emit LogFirstMove(msg.sender, with, msg.value, secretMove);
 
     }
 
@@ -139,35 +149,39 @@ contract RockPaperScissors is Pausable, Destructible, PullPayment {
         // non-zero play
         require(msg.value > 0);
         // Check game
-        var (game, status) = getGameStatus(with);
+        Game storage game;
+        Status status;
+        (game, status) = getGameStatus(with);
         require(status == Status.GAME_P2_WAITING);
         // Sender plays in secret
         game.updatedAt = uint32(block.timestamp);
         game.value2 = msg.value;
         game.move = move;
-        LogSecondMove(msg.sender, with, msg.value, move);
+        emit LogSecondMove(msg.sender, with, msg.value, move);
     }
 
     function revealFirst(address with, Move move, bytes32 secret) external whenNotPaused {
-        var (game, status) = getGameStatus(with);
+        Game storage game;
+        Status status;
+        (game, status) = getGameStatus(with);
         // Both must have played
         require(status == Status.GAME_P1_DONE);
         // Move must match secret move
         require(hashMove(msg.sender, with, move, secret) == game.secretMove);
-        LogFirstReveal(msg.sender, with, move);
+        emit LogFirstReveal(msg.sender, with, move);
         Outcome outcome = getOutcome(move, game.move);
         uint total = game.value1 + game.value2;
         if (outcome == Outcome.WIN) {
             asyncSend(msg.sender, total);
-            LogPayment(msg.sender, with, total, outcome);
+            emit LogPayment(msg.sender, with, total, outcome);
         } else if (outcome == Outcome.LOSE) {
             asyncSend(with, total);
-            LogPayment(with, msg.sender, total, outcome);
+            emit LogPayment(with, msg.sender, total, outcome);
         } else {
             asyncSend(msg.sender, game.value1);
             asyncSend(with, game.value2);
-            LogPayment(msg.sender, with, game.value1, outcome);
-            LogPayment(with, msg.sender, game.value2, outcome);
+            emit LogPayment(msg.sender, with, game.value1, outcome);
+            emit LogPayment(with, msg.sender, game.value2, outcome);
         }
         // Clean-up
         _cleanGame(with);

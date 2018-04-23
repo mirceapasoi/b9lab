@@ -1,4 +1,4 @@
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.23;
 
 import 'zeppelin-solidity/contracts/lifecycle/Pausable.sol';
 import 'zeppelin-solidity/contracts/lifecycle/Destructible.sol';
@@ -7,7 +7,7 @@ import 'zeppelin-solidity/contracts/payment/PullPayment.sol';
 contract Splitter is Pausable, Destructible, PullPayment {
     event LogSplit(address indexed a, address indexed b, address indexed c, uint value);
 
-    function Splitter() public {}
+    constructor() public {}
 
     function split(address b, address c) external payable whenNotPaused {
         require(msg.value > 0); // must be non-zero
@@ -17,6 +17,6 @@ contract Splitter is Pausable, Destructible, PullPayment {
         uint halfValue = msg.value / 2;
         asyncSend(b, halfValue);
         asyncSend(c, halfValue);
-        LogSplit(msg.sender, b, c, halfValue);
+        emit LogSplit(msg.sender, b, c, halfValue);
     }
 }

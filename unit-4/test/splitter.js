@@ -21,13 +21,13 @@ contract("Splitter", (accounts) => {
     }
 
     afterEach("print gas", () => {
-        console.log(`Test: ${getAndClearGas().toLocaleString()} gas used`);
+        console.log(`\tTest: ${getAndClearGas().toLocaleString()} gas used`);
     })
 
     beforeEach("new contract", async () => {
         contract = await Splitter.new({from: owner});
         await measureTx(contract.transactionHash);
-        console.log(`Setup: ${getAndClearGas().toLocaleString()} gas used`);
+        console.log(`\tSetup: ${getAndClearGas().toLocaleString()} gas used`);
     })
 
     // Ownable

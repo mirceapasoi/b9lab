@@ -26,7 +26,7 @@ contract("RockPaperScissors", (accounts) => {
     }
 
     afterEach("print gas", () => {
-        console.log(`Test: ${getAndClearGas().toLocaleString()} gas used`);
+        console.log(`\tTest: ${getAndClearGas().toLocaleString()} gas used`);
     });
 
     beforeEach("new contract", async () => {
@@ -37,7 +37,7 @@ contract("RockPaperScissors", (accounts) => {
         secretA = await contract.hashMove.call(A, B, Move.PAPER, "playerA");
         // B plays in secret (ROCK)
         secretB = await contract.hashMove.call(B, A, Move.ROCK, "playerB");
-        console.log(`Setup: ${getAndClearGas().toLocaleString()} gas used`);
+        console.log(`\tSetup: ${getAndClearGas().toLocaleString()} gas used`);
     });
 
     it("should let player 1 withdraw after 8 hours", async () => {
